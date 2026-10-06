@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Keep the traces of failed end-to-end tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-node-${{ matrix.node }}
+          path: test-results/
+          retention-days: 7
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t myoboard .
+      - run: docker run -d --name myoboard -p 3000:3000 myoboard
+      - name: Answers, signs in and creates a board
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:3000/healthz && break
+            sleep 1
+          done
+          curl -fsS -c jar -H 'content-type: application/json' -d '{"name":"CI","email":"ci@example.com"}' http://127.0.0.1:3000/auth/local
+          curl -fsS -b jar -H 'content-type: application/json' -d '{"title":"Smoke test"}' http://127.0.0.1:3000/api/boards
+          docker inspect --format '{{.State.Health.Status}}' myoboard
+      - name: Server logs
+        if: always()
+        run: docker logs myoboard
