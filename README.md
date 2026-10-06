@@ -51,6 +51,9 @@ npm ci
 npm start
 ```
 
+npm 11 may warn that install scripts for `esbuild` and `fsevents` are not
+approved: leave them so, nothing needs them (both ship ready-made binaries).
+
 `npm start` builds the app and serves it, with real-time sync, on
 <http://localhost:3000>. Without further setup you sign in with a name and an
 email, which nobody checks: fine to try it on your machine. Before sharing
@@ -69,6 +72,12 @@ For development, `npm run dev` runs Vite with hot reload on
 <http://localhost:5173> and the API and sync server on port 1234.
 
 ### Run it with Docker
+
+You need Docker: Docker Desktop, or on a Mac the lighter
+[Colima](https://github.com/abiosoft/colima)
+(`brew install colima docker docker-compose docker-buildx`, add
+`"cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]` to
+`~/.docker/config.json` as Homebrew explains, then `colima start`). Then:
 
 ```bash
 docker compose up -d
@@ -179,10 +188,12 @@ the shared timer, voting, exports, two people editing the same board
 persistence across reloads and devices, connectors, sections and undo, pen
 strokes, shapes, stamps and PNG export, and frame times with 500 sticky
 notes. GitHub Actions runs everything on Node 22 and 24 for every push,
-and builds and smoke-tests the Docker image. It needs a Chromium: run
-`npx playwright install chromium` once, set `PW_CHANNEL=chrome` or
-`PW_CHANNEL=msedge` to use an installed Chrome or Edge, or point
-`CHROMIUM_PATH` at any Chromium binary.
+and builds and smoke-tests the Docker image.
+
+The end-to-end suite needs a Chromium: run `npx playwright install
+chromium` once (about 570 MB in Playwright's cache), or set
+`PW_CHANNEL=chrome` or `PW_CHANNEL=msedge` to use the Chrome or Edge you
+already have, or point `CHROMIUM_PATH` at any Chromium binary.
 
 ## Working on it with Claude Code
 

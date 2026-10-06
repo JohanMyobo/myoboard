@@ -204,6 +204,13 @@ Dockerfile, compose.yaml   the container image and how to run it
   `npm.cmd` and `npx.cmd`.
 - "Port 3000 is already in use" usually means an earlier server is still
   running: stop it, or pass `--port`.
+- In `npm run dev`, Vite's proxy must keep the browser's Host header
+  (`changeOrigin: false` in `vite.config.ts`): the server refuses changes
+  whose Origin does not match the Host it sees, and builds the OIDC
+  redirect from it. A bare URL as a proxy target turns `changeOrigin` on.
+- `package.json` overrides `shell-quote` to a patched version: concurrently
+  (used by `npm run dev`) pins a vulnerable one. Drop the override once
+  concurrently ships a fixed release (`npm audit` should stay at zero).
 - Vite serves the app's own bundles under `/assets/`, so board images live
   under `/media/<board>/<file>` (on disk in `data/media/`). Don't route
   anything else under `/assets/`.
