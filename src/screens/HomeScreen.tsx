@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Search, StickyNote, Trash2 } from 'lucide-react'
+import { LayoutTemplate, Plus, Search, StickyNote, Trash2 } from 'lucide-react'
 import { ROLE_LABEL, api } from '../api'
-import type { BoardListing, User } from '../api'
+import type { BoardListing, TemplateSummary, User } from '../api'
+import { BUILT_IN_TEMPLATES } from '../templates'
 import { STICKY_COLORS } from '../model/palette'
 import { navigate } from '../router'
 import { Brand } from '../ui/Brand'
 import { Modal } from '../ui/Modal'
+import { TemplatePreview } from '../ui/TemplatePreview'
 import { UserMenu } from '../ui/UserMenu'
 import { timeAgo } from '../ui/time'
 
@@ -31,6 +33,15 @@ export function HomeScreen({ user, onSignOut }: { user: User; onSignOut(): void 
   const [query, setQuery] = useState('')
   const [doomed, setDoomed] = useState<BoardListing | null>(null)
   const [busy, setBusy] = useState(false)
+  const [team, setTeam] = useState<TemplateSummary[]>([])
+  const previews = useMemo(() => new Map(BUILT_IN_TEMPLATES.map((t) => [t.key, t.build()])), [])
+
+  useEffect(() => {
+    api
+      .templates()
+      .then(({ templates }) => setTeam(templates))
+      .catch(() => {})
+  }, [])
 
   const load = useCallback(() => {
     api
@@ -40,11 +51,12 @@ export function HomeScreen({ user, onSignOut }: { user: User; onSignOut(): void 
   }, [])
   useEffect(load, [load])
 
-  const create = async () => {
+  /** A new board, filled from a template once it opens (`?template=`). */
+  const create = async (title?: string, template?: string) => {
     setBusy(true)
     try {
-      const { board } = await api.createBoard()
-      navigate(`/b/${board.id}`)
+      const { board } = await api.createBoard(title ? { title } : {})
+      navigate(`/b/${board.id}${template ? `?template=${encodeURIComponent(template)}` : ''}`)
     } catch (err) {
       setProblem((err as Error).message)
       setBusy(false)
@@ -79,7 +91,7 @@ export function HomeScreen({ user, onSignOut }: { user: User; onSignOut(): void 
       <main className="home-main">
         <div className="home-title-row">
           <h1>Boards</h1>
-          <button type="button" className="primary-button" onClick={create} disabled={busy}>
+          <button type="button" className="primary-button" onClick={() => create()} disabled={busy}>
             <Plus size={16} strokeWidth={2} />
             New board
           </button>
@@ -90,6 +102,46 @@ export function HomeScreen({ user, onSignOut }: { user: User; onSignOut(): void 
             {problem}
           </p>
         )}
+
+        <section className="template-strip" aria-label="Start from a template">
+          <h2 className="dialog-subtitle">Start from a template</h2>
+          <div className="template-row">
+            <button type="button" className="template-card compact" aria-label="New blank board" disabled={busy} onClick={() => create()}>
+              <span className="template-blank" aria-hidden>
+                <Plus size={22} strokeWidth={1.75} />
+              </span>
+              <strong>Blank board</strong>
+            </button>
+            {BUILT_IN_TEMPLATES.map((template) => (
+              <button
+                key={template.key}
+                type="button"
+                className="template-card compact"
+                aria-label={`New ${template.name} board`}
+                disabled={busy}
+                onClick={() => create(template.name, template.key)}
+              >
+                <TemplatePreview objects={previews.get(template.key) ?? []} />
+                <strong>{template.name}</strong>
+              </button>
+            ))}
+            {team.slice(0, 6).map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                className="template-card compact"
+                aria-label={`New ${template.name} board`}
+                disabled={busy}
+                onClick={() => create(template.name, `team:${template.id}`)}
+              >
+                <span className="template-icon" aria-hidden>
+                  <LayoutTemplate size={24} strokeWidth={1.5} />
+                </span>
+                <strong>{template.name}</strong>
+              </button>
+            ))}
+          </div>
+        </section>
 
         <div className="home-toolbar">
           <div className="segmented tabs" role="tablist" aria-label="Show">

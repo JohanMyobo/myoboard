@@ -135,7 +135,8 @@ test('pen strokes, shapes with text, stamps and PNG export', async ({ page }, in
 
   // Export downloads a PNG of the whole board.
   const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export PNG' }).click()
+  await page.getByRole('button', { name: 'Export', exact: true }).click()
+  await page.getByRole('button', { name: 'PNG image' }).click()
   const file = await (await download).path()
   const { readFileSync } = await import('node:fs')
   const bytes = readFileSync(file!)

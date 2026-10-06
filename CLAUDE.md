@@ -9,7 +9,7 @@ with Yjs. Boards are Yjs files in `data/`; accounts, sessions, permissions
 and team templates are in `data/myoboard.db` (Node's built-in
 `node:sqlite`). No external service, API key or `.env` file is needed.
 
-Status: v2 in progress ("Not built yet" in README.md lists the gaps). The repository is public: anyone can read everything committed,
+Status: v2 done ("Not built yet" in README.md lists the gaps). The repository is public: anyone can read everything committed,
 history and commit metadata included. Never commit secrets, credentials,
 internal hostnames or URLs, other people's names, or personal data, and
 don't publish packages or releases unless the user asks.
@@ -91,13 +91,17 @@ src/
   BoardScreen.tsx    board page: loads your role, then state, shortcuts, camera, export
   screens/           LoginScreen, HomeScreen (board list), MessageScreen
   clipboard.ts       copy and paste payloads: what a copy takes, pasted text to notes
+  templates.ts       built-in templates (retrospective, brainstorm, kanban)
   model/             no React: types, Board (Yjs), geometry, shapes (outlines,
-                     label boxes), palette
-  sync/              session (y-websocket + IndexedDB), identity (your account)
+                     label boxes), comments (threads), facilitation (timer,
+                     votes), palette
+  sync/              session (y-websocket + IndexedDB), identity (your account),
+                     clock (offset to the server's clock, for timers)
   canvas/            Konva: Canvas (tools, drafts, drag, resize), nodes, camera,
-                     TextEditor, PeerCursors, exportPng
+                     TextEditor, PeerCursors, exportBoard (PNG, JPG, PDF), pdf
   ui/                Toolbar, ContextBar, TopBar, ZoomControls, Swatches,
-                     ShareDialog, Modal, UserMenu
+                     ShareDialog, Modal, MenuButton, UserMenu, CommentLayer,
+                     CommentsPanel, Timer, Voting, TemplatesDialog
   hooks.ts, tools.ts
 server/
   index.ts           CLI: options and OIDC settings, listen, save every board on exit
@@ -113,6 +117,7 @@ server/
   test-helpers.ts    start an app, sign in, sync clients with a cookie
 tests/e2e/           Playwright specs and helpers
 replica/             feature matrix, parity score, recon notes
+Dockerfile, compose.yaml   the container image and how to run it
 ```
 
 ## Document model
@@ -132,6 +137,13 @@ replica/             feature matrix, parity score, recon notes
 - Copies go in through `Board.insertCopies` (duplicate, paste, templates):
   one transaction, so one undo step, with connectors remapped to the
   copies.
+- The same Yjs doc holds `comments` (`model/comments.ts`: threads, each a
+  Y.Map with a Y.Array of messages, optionally pinned to an object) and
+  `facilitation` (`model/facilitation.ts`: the timer and the vote, with one
+  ballot key per voter so nobody overwrites anyone). Neither is undoable:
+  `Board`'s UndoManager only tracks `objects` and `meta`.
+- Timers store absolute times on the server's clock: always use
+  `serverNow()` from `sync/clock.ts`, never `Date.now()`.
 - Back-to-front order is a fractional `index` string
   (`fractional-indexing`); ties break on id.
 - Change a board only through `Board` methods (`create`, `update`,
@@ -202,6 +214,13 @@ replica/             feature matrix, parity score, recon notes
   `POST /api/boards/<id>/assets/import`.
 - Images load once per address (`imageEntry` in `nodes.tsx`), whatever the
   number of objects showing them.
+- A team template's images are copied to the pseudo-board `_t_<template
+  id>` (`/media/_t_<id>/...`), readable by anyone signed in; board ids
+  starting with `_` are therefore refused.
+- While a vote runs, the canvas turns clicks on objects into votes
+  (`onVote`): no selection, dragging, resizing or double-click editing.
+- Exports render through Konva (`renderBoard`): comment pins and vote
+  badges are HTML overlays, so they never end up in an export.
 - End-to-end tests must sign in: `openBoard` in `tests/e2e/helpers.ts` signs
   the page's context in (local mode) and creates the board through the API.
   Server tests use `server/test-helpers.ts` the same way.
@@ -262,9 +281,9 @@ information only. Keep it that way:
 
 ## Next
 
-v2, in order: (1) access: sign-in, permissions, board list, CI (done);
-(2) content: images, copy and paste, more shapes, elbow connectors with
-labels (done); (3) workshops: comments, templates, timer, voting, Docker
-image.
-See `replica/parity.md`. The maintainer sets the scope: check with the user
+v2 is done: access (sign-in, permissions, board list, CI), content
+(images, copy and paste, 10 shapes, connectors with labels) and workshops
+(comments, templates, timer, voting, exports, Docker image); parity 86/100.
+Candidates next, see `replica/parity.md`: rich text, files other than
+images, pinch zoom. The maintainer sets the scope: check with the user
 before starting a large feature.

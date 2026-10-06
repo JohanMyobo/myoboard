@@ -1,7 +1,7 @@
 import { PEN_COLORS, SHAPE_COLORS, STAMPS, STICKY_COLORS } from './model/palette'
 import type { ConnectorStyle, ShapeKind } from './model/types'
 
-export type Tool = 'select' | 'hand' | 'sticky' | 'shape' | 'text' | 'pen' | 'connector' | 'section' | 'stamp'
+export type Tool = 'select' | 'hand' | 'sticky' | 'shape' | 'text' | 'pen' | 'connector' | 'section' | 'stamp' | 'comment'
 
 /** Settings for what the next created object looks like. */
 export interface ToolOptions {
@@ -38,6 +38,7 @@ export const TOOL_KEYS: Record<string, Tool> = {
   c: 'connector',
   f: 'section',
   e: 'stamp',
+  m: 'comment',
 }
 
 export const DEFAULT_SIZES = {

@@ -21,13 +21,13 @@ Duplicate delete and bring to front,editing,should,yes,yes,
 Change colour and shape from the selection,editing,should,yes,yes,
 See who is on the board,collaboration,should,yes,yes,
 See what others have selected,collaboration,should,yes,yes,
-Export the board as an image,export,should,yes,partial,PNG only
-Comments,comments,should,yes,no,
+Export the board as an image,export,should,yes,yes,PNG JPG or PDF; the whole board or the selection
+Comments,comments,should,yes,yes,pinned to the board or to an object; threads with replies; resolve; a panel of open and resolved threads
 Images and file uploads,media,should,yes,partial,images (PNG JPEG GIF WebP) from a button or by dropping or pasting; no other files
 Copy and paste,editing,should,yes,yes,within and between boards through the system clipboard (images copied over); pasted lines become sticky notes
-Templates,templates,should,yes,no,
-Voting sessions,facilitation,should,yes,no,
-Timer,facilitation,should,yes,no,
+Templates,templates,should,yes,yes,retrospective brainstorm and kanban built in; save a board or a selection as a team template
+Voting sessions,facilitation,should,yes,yes,votes per person; hidden until the vote ends; ranked results
+Timer,facilitation,should,yes,yes,shared countdown on the server's clock; pause add time stop; chime
 Rich text (bold lists sizes),text,should,yes,no,
 Tables,tables,could,yes,no,
 Cursor chat,collaboration,could,yes,no,

@@ -3,10 +3,31 @@ import type { RefObject } from 'react'
 import type { Awareness } from 'y-protocols/awareness'
 import type { WebsocketProvider } from 'y-websocket'
 import type { Board, BoardSnapshot } from './model/board'
+import type { Comments, CommentsSnapshot } from './model/comments'
+import type { Facilitation, FacilitationSnapshot } from './model/facilitation'
 import type { ConnectionStatus, PresenceState } from './sync/session'
 
 export function useBoardSnapshot(board: Board): BoardSnapshot {
   return useSyncExternalStore(board.subscribe, board.getSnapshot)
+}
+
+export function useComments(comments: Comments): CommentsSnapshot {
+  return useSyncExternalStore(comments.subscribe, comments.getSnapshot)
+}
+
+export function useFacilitation(facilitation: Facilitation): FacilitationSnapshot {
+  return useSyncExternalStore(facilitation.subscribe, facilitation.getSnapshot)
+}
+
+/** Re-renders every `ms` while `active`, for countdowns. */
+export function useTicker(active: boolean, ms = 250): number {
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (!active) return
+    const id = window.setInterval(() => setTick((t) => t + 1), ms)
+    return () => window.clearInterval(id)
+  }, [active, ms])
+  return tick
 }
 
 export interface Peer extends PresenceState {

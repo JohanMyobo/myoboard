@@ -298,14 +298,14 @@ export class Store {
 
   // --- Team templates ------------------------------------------------------
 
-  createTemplate(input: { name: string; description: string; ownerId: string; objects: unknown[] }): TemplateRecord {
+  createTemplate(input: { id?: string; name: string; description: string; ownerId: string; objects: unknown[] }): TemplateRecord {
     const row = this.db
       .prepare(
         `INSERT INTO templates (id, name, description, owner_id, created_at, objects)
          VALUES (:id, :name, :description, :owner, :now, :objects) RETURNING id`,
       )
       .get({
-        id: nanoid(12),
+        id: input.id ?? nanoid(12),
         name: input.name.trim().slice(0, 80),
         description: input.description.trim().slice(0, 300),
         owner: input.ownerId,

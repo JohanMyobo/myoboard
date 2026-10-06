@@ -74,6 +74,10 @@ export interface CanvasProps {
   fullRender: boolean
   /** A viewer: select and look around, but change nothing. */
   readOnly: boolean
+  /** The comment tool was clicked here, possibly on an object. */
+  onCommentAt(at: { x: number; y: number; on: string | null }): void
+  /** Set while a vote runs: clicking an object votes for it (retract: take a vote back). */
+  onVote?: (id: string, retract: boolean) => void
 }
 
 const RESIZABLE: ReadonlySet<BoardObject['type']> = new Set(['sticky', 'shape', 'section', 'text', 'image'])
@@ -345,6 +349,11 @@ export function Canvas(props: CanvasProps) {
         beginDraft({ kind: 'connector', from: hit ? { id: hit.id } : { x: round1(world.x), y: round1(world.y) }, end: world, hoverId: null })
         return
       }
+      case 'comment': {
+        const target = topmostAt(world, snap.ordered, { includeSections: false })
+        latest.current.onCommentAt({ x: world.x, y: world.y, on: target?.id ?? null })
+        return
+      }
       case 'hand':
         return
     }
@@ -369,8 +378,12 @@ export function Canvas(props: CanvasProps) {
   const handlers = useMemo<NodeHandlers>(
     () => ({
       pointerDown(id, e) {
-        const { tool: currentTool, panKey: spaceHeld } = latest.current
+        const { tool: currentTool, panKey: spaceHeld, onVote } = latest.current
         if (currentTool !== 'select' || spaceHeld || e.evt.button !== 0) return
+        if (onVote) {
+          onVote(id, e.evt.shiftKey)
+          return
+        }
         const current = selectionRef.current
         if (e.evt.shiftKey) selectNow(current.includes(id) ? current.filter((x) => x !== id) : [...current, id])
         else if (!current.includes(id)) selectNow([id])
@@ -416,7 +429,8 @@ export function Canvas(props: CanvasProps) {
       },
       dblClick(id) {
         const obj = latest.current.snapshot.byId.get(id)
-        if (!obj || latest.current.tool !== 'select' || latest.current.readOnly || !EDITABLE.has(obj.type)) return
+        // While voting, quick clicks are votes, not a double-click to edit.
+        if (!obj || latest.current.tool !== 'select' || latest.current.readOnly || latest.current.onVote || !EDITABLE.has(obj.type)) return
         selectNow([id])
         latest.current.setEditingId(id)
       },
@@ -466,7 +480,7 @@ export function Canvas(props: CanvasProps) {
 
   // The transformer (resize handles) shows for one resizable object at a time.
   const single = selection.length === 1 ? (snapshot.byId.get(selection[0]) ?? null) : null
-  const resizable = single && RESIZABLE.has(single.type) && tool === 'select' && !editingId && !draft && !readOnly ? single : null
+  const resizable = single && RESIZABLE.has(single.type) && tool === 'select' && !editingId && !draft && !readOnly && !props.onVote ? single : null
   useEffect(() => {
     const tr = trRef.current
     const stage = stageRef.current
@@ -523,7 +537,7 @@ export function Canvas(props: CanvasProps) {
     // `region` only matters through `regionKey`, which snaps while panning.
   }, [snapshot, regionKey, fullRender, selection, editingId])
 
-  const draggable = tool === 'select' && !panKey && !readOnly
+  const draggable = tool === 'select' && !panKey && !readOnly && !props.onVote
   const s = camera.scale
   const selected = useMemo(() => new Set(selection), [selection])
 

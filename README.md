@@ -32,11 +32,15 @@ time between everyone on the same board.
   else: nothing, viewing or editing. Viewers see changes live but can
   change nothing, enforced by the server.
 - **Your boards**: one page lists the boards you own, were invited to or
-  opened, with search and filters.
-- **Sharing and export**: one link per board, editable title, PNG export of
-  the whole board.
-- Pans at a median 60 fps with 500 sticky notes, measured in headless
-  Chromium without a GPU (see [Tests](#tests)).
+  opened, with search and filters, and starts new boards from templates.
+- **Workshops**: comments pinned to the board or to a note, with replies
+  and resolving; templates (retrospective, brainstorm, kanban, and your
+  team's own, saved from any board); a shared timer everyone sees; voting
+  sessions with a number of votes per person, results hidden until the end.
+- **Sharing and export**: one link per board, editable title, export of the
+  whole board or the selection as PNG, JPG or PDF.
+- Pans at a median 60 fps with 500 sticky notes, at every zoom level,
+  measured in headless Chromium and in Chrome on macOS (see [Tests](#tests)).
 
 ## Run it
 
@@ -63,6 +67,19 @@ Pass flags after `--`, as in `npm start -- --port 4000`.
 
 For development, `npm run dev` runs Vite with hot reload on
 <http://localhost:5173> and the API and sync server on port 1234.
+
+### Run it with Docker
+
+```bash
+docker compose up -d
+```
+
+builds the image and serves Myoboard on <http://localhost:3000>, with its
+data in a Docker volume (`/data` in the container). Edit `compose.yaml` to
+set `PUBLIC_URL` and the `OIDC_*` variables below, and put HTTPS in front
+of it (a reverse proxy such as Caddy, nginx or your company's load
+balancer). The image runs as an unprivileged user and reports its health
+on `/healthz`.
 
 ### Sign in with your company's accounts
 
@@ -97,6 +114,7 @@ company's accounts can sign in; `OIDC_ALLOWED_DOMAINS` adds a second check.
 | `V` / `H`                  | Select / hand (pan)               |
 | `S` / `R` / `T`            | Sticky note / shape / text        |
 | `P` / `C` / `F` / `E`      | Pen / connector / section / stamp |
+| `M`                        | Comment                           |
 | Space + drag               | Pan with any tool                 |
 | Enter or double-click      | Edit the selected object's text (a connector's label) |
 | Esc                        | Finish editing, clear selection   |
@@ -120,7 +138,8 @@ browser                                        server (one Node process)
 ```
 
 - **Document model** (`src/model`): a board is a flat map of objects, and
-  each object is a map of properties. Concurrent edits merge property by
+  each object is a map of properties. Comments, the timer and votes live
+  in the same Yjs document, outside undo. Concurrent edits merge property by
   property (last writer wins), so two people moving and recolouring the same
   sticky never conflict. A fractional `index` orders objects back to front.
   Built on [Yjs](https://github.com/yjs/yjs).
@@ -154,11 +173,13 @@ to edit through the sync protocol), images and a complete OpenID Connect
 sign-in against a local test provider. The end-to-end suite checks
 signing in and the board list, sharing with viewers and editors live,
 images (toolbar, drop, paste), copy and paste within and between boards,
-shapes and labelled connectors, two people editing the same board (edits,
-drags, cursors, presence),
+shapes and labelled connectors, comments between two people, templates,
+the shared timer, voting, exports, two people editing the same board
+(edits, drags, cursors, presence),
 persistence across reloads and devices, connectors, sections and undo, pen
 strokes, shapes, stamps and PNG export, and frame times with 500 sticky
-notes. GitHub Actions runs everything on Node 22 and 24 for every push. It needs a Chromium: run
+notes. GitHub Actions runs everything on Node 22 and 24 for every push,
+and builds and smoke-tests the Docker image. It needs a Chromium: run
 `npx playwright install chromium` once, set `PW_CHANNEL=chrome` or
 `PW_CHANNEL=msedge` to use an installed Chrome or Edge, or point
 `CHROMIUM_PATH` at any Chromium binary.
@@ -191,9 +212,9 @@ feature matrix and parity score are in [`replica/`](replica).
 
 ## Not built yet
 
-Comments, templates, voting, timer, rich text, files other than images.
-See [`replica/parity.md`](replica/parity.md) for the full list, in build
-order.
+Rich text (bold, lists, sizes), files other than images, tables, cursor
+chat, following a collaborator, AI. See
+[`replica/parity.md`](replica/parity.md) for the full list, in build order.
 
 ## License
 

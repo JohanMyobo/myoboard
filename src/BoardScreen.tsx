@@ -12,22 +12,33 @@ import { TextEditor } from './canvas/TextEditor'
 import type { EditableObject } from './canvas/TextEditor'
 import { fitBox, toScreen, toWorld, zoomAt } from './canvas/camera'
 import type { Camera } from './canvas/camera'
-import { contentBounds, downloadDataUrl, fileNameFor, renderBoardPng } from './canvas/exportPng'
-import { useBoardSnapshot, useConnectionStatus, useElementSize, usePeers } from './hooks'
+import { contentBounds, downloadDataUrl, encodeBoard, fileNameFor, renderBoard } from './canvas/exportBoard'
+import type { ExportFormat } from './canvas/exportBoard'
+import { useBoardSnapshot, useComments, useConnectionStatus, useElementSize, useFacilitation, usePeers } from './hooks'
+import { pinPosition } from './model/comments'
 import { connectorRoute, objectBounds, unionBoxes } from './model/geometry'
 import type { Point } from './model/geometry'
 import type { BoardObject, NewObject } from './model/types'
 import { navigate } from './router'
 import { MessageScreen } from './screens/MessageScreen'
+import { syncClock } from './sync/clock'
 import type { Identity } from './sync/identity'
 import { ACCESS_CHANGED, openBoardSession } from './sync/session'
+import { builtInTemplate } from './templates'
 import type { BoardSession } from './sync/session'
 import { DEFAULT_TOOL_OPTIONS, READ_ONLY_TOOLS, TOOL_KEYS } from './tools'
 import type { Tool, ToolOptions } from './tools'
+import { CommentLayer } from './ui/CommentLayer'
+import type { CommentDraft } from './ui/CommentLayer'
+import { CommentsPanel } from './ui/CommentsPanel'
 import { ContextBar } from './ui/ContextBar'
 import { ShareDialog } from './ui/ShareDialog'
+import { TemplatesDialog } from './ui/TemplatesDialog'
+import type { TemplateChoice } from './ui/TemplatesDialog'
+import { TimerMenu, TimerPill } from './ui/Timer'
 import { Toolbar } from './ui/Toolbar'
 import { TopBar } from './ui/TopBar'
+import { VOTABLE, VoteBadges, VoteBanner, VoteMenu } from './ui/Voting'
 import { ZoomControls } from './ui/ZoomControls'
 
 declare global {
@@ -175,6 +186,16 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
   const [notice, setNotice] = useState<string | null>(null)
   const [fullRender, setFullRender] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [choosingTemplate, setChoosingTemplate] = useState(false)
+  const [commentsPanel, setCommentsPanel] = useState(false)
+  const [openThread, setOpenThread] = useState<string | null>(null)
+  const [commentDraft, setCommentDraft] = useState<CommentDraft | null>(null)
+  const comments = useComments(session.comments)
+  const facilitation = useFacilitation(session.facilitation)
+
+  useEffect(() => {
+    void syncClock()
+  }, [])
 
   const cameraRef = useRef(camera)
   cameraRef.current = camera
@@ -438,22 +459,24 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
     }
   }
 
-  const exportPng = () => {
+  const exportBoard = (format: ExportFormat, onlySelection: boolean) => {
     const stage = stageRef.current
     if (!stage) return
+    const current = board.getSnapshot()
+    const only = onlySelection ? new Set(copySelection(current, selection, session.boardId)?.objects.map((obj) => obj.id) ?? []) : null
     // Mount every object in full detail for the duration of the render.
     flushSync(() => setFullRender(true))
-    let url: string | null
+    let canvas: HTMLCanvasElement | null
     try {
-      url = renderBoardPng(stage, overlayRef.current, board.getSnapshot(), cameraRef.current)
+      canvas = renderBoard(stage, overlayRef.current, current, cameraRef.current, only)
     } finally {
       setFullRender(false)
     }
-    if (!url) {
+    if (!canvas) {
       flash('Nothing to export yet')
       return
     }
-    downloadDataUrl(url, fileNameFor(snapshot.title))
+    downloadDataUrl(encodeBoard(canvas, format), fileNameFor(snapshot.title, format))
   }
 
   const closeEditor = useCallback(() => {
@@ -528,6 +551,8 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
       if (e.key === 'Escape') {
         setSelection([])
         setTool('select')
+        setCommentDraft(null)
+        setOpenThread(null)
         return
       }
       if (e.key === 'Enter' && state.selection.length === 1 && !state.readOnly) {
@@ -567,6 +592,126 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
       window.removeEventListener('blur', onBlur)
     }
   }, [board, setTool])
+
+  // --- Templates ------------------------------------------------------------
+
+  const insertTemplate = useCallback(
+    async (choice: TemplateChoice, fitAfter = false) => {
+      setChoosingTemplate(false)
+      try {
+        let payload: ClipboardPayload
+        if (choice.kind === 'built-in') {
+          const template = builtInTemplate(choice.key)
+          if (!template) return
+          payload = { myoboard: 1, board: session.boardId, objects: template.build() }
+        } else {
+          const { template } = await api.template(choice.id)
+          // Its images live with the template: pasting copies them to this board.
+          payload = { myoboard: 1, board: `_t_${template.id}`, objects: template.objects as BoardObject[] }
+        }
+        await pastePayload(payload, viewCenter())
+        if (fitAfter) {
+          // A board made from a template opens on its content, nothing selected.
+          setSelection([])
+          window.requestAnimationFrame(() => fit())
+        }
+      } catch (err) {
+        flash((err as Error).message)
+      }
+    },
+    [session.boardId, pastePayload, viewCenter, fit, flash],
+  )
+
+  const saveTemplate = useCallback(
+    async (name: string, description: string) => {
+      const current = board.getSnapshot()
+      const ids = selection.length > 0 ? selection : current.ordered.map((obj) => obj.id)
+      const payload = copySelection(current, ids, session.boardId)
+      if (!payload) throw new Error('The board is empty: add something first')
+      await api.saveTemplate({ name, description, objects: payload.objects })
+      flash(`Saved “${name}” for your team`)
+    },
+    [board, selection, session.boardId, flash],
+  )
+
+  // A board created from a template on the home page fills itself once synced.
+  const pendingTemplate = useRef<TemplateChoice | null>(
+    (() => {
+      const value = new URLSearchParams(location.search).get('template')
+      if (!value) return null
+      return value.startsWith('team:') ? { kind: 'team', id: value.slice(5) } : { kind: 'built-in', key: value }
+    })(),
+  )
+  useEffect(() => {
+    if (!pendingTemplate.current || readOnly) return
+    const run = () => {
+      const choice = pendingTemplate.current
+      if (!choice) return
+      pendingTemplate.current = null
+      history.replaceState(null, '', location.pathname)
+      if (board.getSnapshot().ordered.length === 0) void insertTemplate(choice, true)
+    }
+    if (session.provider.synced) {
+      run()
+      return
+    }
+    const onSync = (synced: boolean) => {
+      if (synced) run()
+    }
+    session.provider.on('sync', onSync)
+    return () => session.provider.off('sync', onSync)
+  }, [session, board, readOnly, insertTemplate])
+
+  // --- Comments -------------------------------------------------------------
+
+  const lookup = useCallback((id: string) => snapshot.byId.get(id), [snapshot])
+  const me = useMemo(() => ({ id: identity.id, name: identity.name, color: identity.color }), [identity])
+  const openCommentCount = comments.threads.filter((t) => !t.resolved).length
+
+  const startComment = useCallback((at: CommentDraft) => {
+    setOpenThread(null)
+    setCommentDraft(at)
+  }, [])
+
+  const createComment = (text: string) => {
+    if (!commentDraft) return
+    const on = commentDraft.on ? board.get(commentDraft.on) : null
+    session.comments.start({ x: commentDraft.x, y: commentDraft.y, on }, me, text)
+    setCommentDraft(null)
+    setTool('select')
+  }
+
+  /** Brings a thread's pin to the middle of the view and opens it. */
+  const focusThread = (id: string) => {
+    const thread = comments.threads.find((t) => t.id === id)
+    if (!thread) return
+    const at = pinPosition(thread, lookup)
+    const { width, height } = sizeRef.current
+    setCamera((cam) => ({ scale: cam.scale, x: width / 2 - at.x * cam.scale, y: height / 2 - at.y * cam.scale }))
+    setCommentDraft(null)
+    setOpenThread(id)
+  }
+
+  // --- Voting ----------------------------------------------------------------
+
+  const voting = facilitation.vote?.status === 'running' && !readOnly
+  const vote = useCallback(
+    (id: string, retract: boolean) => {
+      const target = board.get(id)
+      if (!target || !VOTABLE.has(target.type)) return
+      if (retract) session.facilitation.retractVote(identity.id, id)
+      else if (!session.facilitation.castVote(identity.id, id)) flash('No votes left: Shift-click a note to take one back')
+    },
+    [board, session.facilitation, identity.id, flash],
+  )
+  const showObject = (id: string) => {
+    const obj = board.get(id)
+    const box = obj ? objectBounds(obj, lookup) : null
+    if (!box) return
+    const { width, height } = sizeRef.current
+    setCamera((cam) => ({ scale: cam.scale, x: width / 2 - (box.x + box.w / 2) * cam.scale, y: height / 2 - (box.y + box.h / 2) * cam.scale }))
+    setSelection([id])
+  }
 
   useEffect(() => {
     const handle = {
@@ -616,7 +761,13 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
         className="canvas-wrap"
         ref={wrapRef}
         style={gridStyle(camera)}
-        onPointerDownCapture={() => (autoFitRef.current = false)}
+        onPointerDownCapture={() => {
+          autoFitRef.current = false
+          if (tool !== 'comment') {
+            setOpenThread(null)
+            setCommentDraft(null)
+          }
+        }}
         onDragOver={(e) => {
           if (readOnly || ![...e.dataTransfer.types].includes('Files')) return
           e.preventDefault()
@@ -652,6 +803,8 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
             overlayRef={overlayRef}
             fullRender={fullRender}
             readOnly={readOnly}
+            onCommentAt={startComment}
+            onVote={voting ? vote : undefined}
           />
         )}
         <PeerCursors awareness={session.awareness} camera={camera} />
@@ -683,6 +836,27 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
         )}
       </div>
 
+      <VoteBadges state={facilitation} me={me} lookup={lookup} camera={camera} />
+      <CommentLayer
+        comments={session.comments}
+        threads={comments.threads}
+        lookup={lookup}
+        camera={camera}
+        size={size}
+        me={me}
+        isOwner={access.role === 'owner'}
+        readOnly={readOnly}
+        showResolved={false}
+        openId={openThread}
+        onOpen={(id) => {
+          setCommentDraft(null)
+          setOpenThread(id)
+        }}
+        draft={commentDraft}
+        onCancelDraft={() => setCommentDraft(null)}
+        onCreate={createComment}
+      />
+
       <TopBar
         title={snapshot.title}
         onRename={(title) => board.setTitle(title)}
@@ -695,11 +869,37 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
         canRedo={board.canRedo()}
         onUndo={() => board.undo()}
         onRedo={() => board.redo()}
-        onExport={exportPng}
+        selectionCount={selection.length}
+        onExport={exportBoard}
         onNewBoard={newBoard}
         onShare={() => setSharing(true)}
         onHome={() => navigate('/')}
+        openComments={openCommentCount}
+        commentsShown={commentsPanel}
+        onToggleComments={() => setCommentsPanel((shown) => !shown)}
+        onTemplates={() => setChoosingTemplate(true)}
+        timerMenu={(close) => <TimerMenu facilitation={session.facilitation} timer={facilitation.timer} me={me} readOnly={readOnly} onDone={close} />}
+        timerActive={facilitation.timer !== null}
+        voteMenu={(close) => <VoteMenu facilitation={session.facilitation} state={facilitation} me={me} readOnly={readOnly} onDone={close} />}
+        voteActive={facilitation.vote !== null}
       />
+      <div className="top-center">
+        <TimerPill facilitation={session.facilitation} timer={facilitation.timer} readOnly={readOnly} />
+        <VoteBanner facilitation={session.facilitation} state={facilitation} me={me} readOnly={readOnly} lookup={lookup} onShow={showObject} />
+      </div>
+      {commentsPanel && (
+        <CommentsPanel threads={comments.threads} openId={openThread} onFocus={focusThread} onClose={() => setCommentsPanel(false)} />
+      )}
+      {choosingTemplate && (
+        <TemplatesDialog
+          user={user}
+          canEdit={!readOnly}
+          selectionCount={selection.length}
+          onInsert={(choice) => void insertTemplate(choice)}
+          onSave={saveTemplate}
+          onClose={() => setChoosingTemplate(false)}
+        />
+      )}
       <input
         ref={fileInputRef}
         type="file"

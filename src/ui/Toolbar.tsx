@@ -1,4 +1,4 @@
-import { Frame, Hand, ImagePlus, MousePointer2, PenLine, Shapes, Spline, Stamp, StickyNote, Type } from 'lucide-react'
+import { Frame, Hand, ImagePlus, MessageCircle, MousePointer2, PenLine, Shapes, Spline, Stamp, StickyNote, Type } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { PEN_COLORS, SHAPE_COLORS, STAMPS, STICKY_COLORS } from '../model/palette'
 import type { ShapeKind } from '../model/types'
@@ -17,6 +17,7 @@ const TOOLS: { tool: Tool; label: string; shortcut: string; icon: LucideIcon }[]
   { tool: 'connector', label: 'Connector', shortcut: 'C', icon: Spline },
   { tool: 'section', label: 'Section', shortcut: 'F', icon: Frame },
   { tool: 'stamp', label: 'Stamp', shortcut: 'E', icon: Stamp },
+  { tool: 'comment', label: 'Comment', shortcut: 'M', icon: MessageCircle },
 ]
 
 interface ToolbarProps {

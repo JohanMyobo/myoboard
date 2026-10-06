@@ -3,6 +3,8 @@ import { WebsocketProvider } from 'y-websocket'
 import { IndexeddbPersistence } from 'y-indexeddb'
 import type { Awareness } from 'y-protocols/awareness'
 import { Board } from '../model/board'
+import { Comments } from '../model/comments'
+import { Facilitation } from '../model/facilitation'
 import type { Identity } from './identity'
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
@@ -20,6 +22,9 @@ export interface BoardSession {
   readonly boardId: string
   readonly doc: Y.Doc
   readonly board: Board
+  readonly comments: Comments
+  /** The shared timer and voting sessions. */
+  readonly facilitation: Facilitation
   readonly provider: WebsocketProvider
   readonly awareness: Awareness
   /** Local copy in IndexedDB: the board opens instantly and survives going offline. */
@@ -42,6 +47,8 @@ export function syncServerUrl(): string {
 export function openBoardSession(boardId: string, identity: Identity): BoardSession {
   const doc = new Y.Doc()
   const board = new Board(doc)
+  const comments = new Comments(doc)
+  const facilitation = new Facilitation(doc)
   const offline = new IndexeddbPersistence(`myoboard:${boardId}`, doc)
   const provider = new WebsocketProvider(syncServerUrl(), boardId, doc, { maxBackoffTime: 4000 })
   const awareness = provider.awareness
@@ -52,6 +59,8 @@ export function openBoardSession(boardId: string, identity: Identity): BoardSess
     boardId,
     doc,
     board,
+    comments,
+    facilitation,
     provider,
     awareness,
     offline,
@@ -60,6 +69,8 @@ export function openBoardSession(boardId: string, identity: Identity): BoardSess
       provider.destroy()
       void offline.destroy()
       board.destroy()
+      comments.destroy()
+      facilitation.destroy()
       doc.destroy()
     },
   }

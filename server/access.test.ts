@@ -195,6 +195,28 @@ describe('accounts and board permissions', () => {
     expect((await call(base, guest, 'POST', `/api/boards/${to}/assets/import`, { url })).status).toBe(403)
   })
 
+  it('keeps a template\'s images readable by everyone, even without access to their board', async () => {
+    const id = await create()
+    const upload = await fetch(`${base}/api/boards/${id}/assets`, { method: 'POST', headers: { cookie: owner }, body: PNG })
+    const { url } = (await upload.json()) as { url: string }
+    const saved = await call(base, owner, 'POST', '/api/templates', {
+      name: 'With a picture',
+      objects: [{ id: 'i', type: 'image', x: 0, y: 0, w: 10, h: 10, src: url }],
+    })
+    const template = saved.json.template as { id: string; objects: { src: string }[] }
+    expect(template.objects[0].src).toMatch(new RegExp(`^/media/_t_${template.id}/`))
+    await call(base, owner, 'PATCH', `/api/boards/${id}`, { linkAccess: 'none' })
+
+    expect((await fetch(`${base}${template.objects[0].src}`, { headers: { cookie: guest } })).status).toBe(200)
+    const theirs = await create(guest)
+    const copied = await call(base, guest, 'POST', `/api/boards/${theirs}/assets/import`, { url: template.objects[0].src })
+    expect(copied.status).toBe(201)
+  })
+
+  it('reserves board ids starting with an underscore', async () => {
+    expect((await call(base, owner, 'POST', '/api/boards', { id: '_t_sneaky' })).status).toBe(400)
+  })
+
   it('shares team templates with everyone, and lets their author delete them', async () => {
     const saved = await call(base, owner, 'POST', '/api/templates', {
       name: 'Team retro',
