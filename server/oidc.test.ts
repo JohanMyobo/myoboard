@@ -71,8 +71,9 @@ async function startProvider(claims: () => Record<string, unknown>) {
 }
 
 /** Follows the sign-in redirects like a browser would, and returns where it ends up and the cookie set. */
-async function signInThroughProvider(base: string, next = '/b/some-board') {
-  const start = await fetch(`${base}/auth/login?next=${encodeURIComponent(next)}`, { redirect: 'manual' })
+async function signInThroughProvider(base: string, next = '/b/some-board', provider?: string) {
+  const pick = provider ? `&provider=${provider}` : ''
+  const start = await fetch(`${base}/auth/login?next=${encodeURIComponent(next)}${pick}`, { redirect: 'manual' })
   expect(start.status).toBe(302)
   const atProvider = await fetch(start.headers.get('location')!, { redirect: 'manual' })
   const callback = await fetch(atProvider.headers.get('location')!, { redirect: 'manual' })
@@ -89,7 +90,9 @@ describe('single sign-on (OpenID Connect)', () => {
     provider = await startProvider(() => claims)
     running = await startApp({
       auth: {
-        oidc: { issuer: provider.issuer, clientId: 'myoboard', clientSecret: 'top-secret', allowHttp: true, allowedDomains: ['example.com'] },
+        providers: [
+          { id: 'sso', name: 'Example SSO', issuer: provider.issuer, clientId: 'myoboard', clientSecret: 'top-secret', allowHttp: true, allowedDomains: ['example.com'] },
+        ],
       },
     })
   })
@@ -104,7 +107,7 @@ describe('single sign-on (OpenID Connect)', () => {
     const { location, cookie } = await signInThroughProvider(running.base, '/b/some-board')
     expect(location).toBe('/b/some-board')
     const me = await call(running.base, cookie, 'GET', '/api/me')
-    expect(me.json).toMatchObject({ user: { email: 'ada@example.com', name: 'Ada Lovelace' }, auth: { mode: 'oidc', providerName: 'single sign-on' } })
+    expect(me.json).toMatchObject({ user: { email: 'ada@example.com', name: 'Ada Lovelace' }, auth: { local: false, providers: [{ id: 'sso', name: 'Example SSO' }] } })
   })
 
   it('uses the Microsoft-style preferred_username when there is no email claim', async () => {
@@ -127,9 +130,14 @@ describe('single sign-on (OpenID Connect)', () => {
     expect(forged.headers.get('set-cookie')).toBeNull()
   })
 
-  it('does not offer name-and-email sign-in', async () => {
+  it('turns name-and-email sign-in off once a provider is set up', async () => {
     const res = await call(running.base, null, 'POST', '/auth/local', { name: 'Eve', email: 'eve@example.com' })
     expect(res.status).toBe(403)
+  })
+
+  it('refuses a provider that is not set up', async () => {
+    const res = await fetch(`${running.base}/auth/login?provider=nope`, { redirect: 'manual' })
+    expect(decodeURIComponent(res.headers.get('location') ?? '')).toContain('not set up')
   })
 
   it('never sends people to another site after signing in', async () => {
@@ -148,14 +156,18 @@ describe('single sign-on with Google Workspace', () => {
     provider = await startProvider(() => claims)
     running = await startApp({
       auth: {
-        oidc: {
-          issuer: provider.issuer,
-          clientId: 'myoboard',
-          clientSecret: 'top-secret',
-          allowHttp: true,
-          allowedDomains: ['example.com'],
-          requireHostedDomain: true,
-        },
+        providers: [
+          {
+            id: 'google',
+            name: 'Google',
+            issuer: provider.issuer,
+            clientId: 'myoboard',
+            clientSecret: 'top-secret',
+            allowHttp: true,
+            allowedDomains: ['example.com'],
+            requireHostedDomain: true,
+          },
+        ],
       },
     })
   })
@@ -181,5 +193,47 @@ describe('single sign-on with Google Workspace', () => {
   it('asks Google to offer only the company accounts', async () => {
     const start = await fetch(`${running.base}/auth/login`, { redirect: 'manual' })
     expect(new URL(start.headers.get('location')!).searchParams.get('hd')).toBe('example.com')
+  })
+})
+
+describe('several ways to sign in at once', () => {
+  let work: Awaited<ReturnType<typeof startProvider>>
+  let other: Awaited<ReturnType<typeof startProvider>>
+  let running: Running
+
+  beforeEach(async () => {
+    work = await startProvider(() => ({ email: 'ada@example.com', email_verified: true, name: 'Ada at work', hd: 'example.com' }))
+    other = await startProvider(() => ({ email: 'ada@personal.example', email_verified: true, name: 'Ada at home' }))
+    const settings = (id: string, name: string, issuer: string) => ({ id, name, issuer, clientId: 'myoboard', clientSecret: 'top-secret', allowHttp: true })
+    running = await startApp({
+      auth: {
+        providers: [settings('google', 'Google', work.issuer), settings('oidc', 'Microsoft', other.issuer)],
+        localSignIn: true,
+      },
+    })
+  })
+
+  afterEach(async () => {
+    await running.close()
+    await work.close()
+    await other.close()
+  })
+
+  it('offers every way that is set up, name and email included when asked', async () => {
+    const me = await call(running.base, null, 'GET', '/api/me')
+    expect(me.json.auth).toEqual({ local: true, providers: [{ id: 'google', name: 'Google' }, { id: 'oidc', name: 'Microsoft' }] })
+    expect((await call(running.base, null, 'POST', '/auth/local', { name: 'Eve', email: 'eve@example.com' })).status).toBe(200)
+  })
+
+  it('signs in through the provider picked, all with one callback address', async () => {
+    const first = await signInThroughProvider(running.base, '/', 'google')
+    expect((await call(running.base, first.cookie, 'GET', '/api/me')).json.user).toMatchObject({ email: 'ada@example.com' })
+    const second = await signInThroughProvider(running.base, '/', 'oidc')
+    expect((await call(running.base, second.cookie, 'GET', '/api/me')).json.user).toMatchObject({ email: 'ada@personal.example' })
+  })
+
+  it('sends people to the sign-in page to choose when no provider is named', async () => {
+    const res = await fetch(`${running.base}/auth/login?next=/b/x`, { redirect: 'manual' })
+    expect(res.headers.get('location')).toBe('/login?next=%2Fb%2Fx')
   })
 })

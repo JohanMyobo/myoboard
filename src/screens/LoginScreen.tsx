@@ -14,6 +14,7 @@ interface LoginScreenProps {
   onSignedIn(user: User): void
 }
 
+/** One button per identity provider the server has, and the name-and-email form if it is on. */
 export function LoginScreen({ auth, next, error, onSignedIn }: LoginScreenProps) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -44,27 +45,38 @@ export function LoginScreen({ auth, next, error, onSignedIn }: LoginScreenProps)
             {problem}
           </p>
         )}
-        {auth.mode === 'oidc' ? (
-          <a className="primary-button wide" href={`/auth/login?next=${encodeURIComponent(next)}`}>
+        {auth.providers.map((provider, i) => (
+          <a
+            key={provider.id}
+            className={`${i === 0 ? 'primary-button' : 'secondary-button'} wide`}
+            href={`/auth/login?provider=${encodeURIComponent(provider.id)}&next=${encodeURIComponent(next)}`}
+          >
             <LogIn size={16} strokeWidth={2} />
-            Continue with {auth.providerName}
+            Continue with {provider.name}
           </a>
-        ) : (
+        ))}
+        {auth.local && auth.providers.length > 0 && (
+          <div className="or-divider" role="separator">
+            <span>or</span>
+          </div>
+        )}
+        {auth.local && (
           <form className="login-form" onSubmit={submit}>
             <label>
               <span>Your name</span>
-              <input autoFocus required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+              <input autoFocus={auth.providers.length === 0} required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
             </label>
             <label>
-              <span>Work email</span>
+              <span>Email</span>
               <input required type="email" maxLength={200} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             </label>
-            <button type="submit" className="primary-button wide" disabled={busy}>
-              {busy ? 'Signing in…' : 'Continue'}
+            <button type="submit" className={`${auth.providers.length > 0 ? 'secondary-button' : 'primary-button'} wide`} disabled={busy}>
+              {busy ? 'Signing in…' : auth.providers.length > 0 ? 'Continue with name and email' : 'Continue'}
             </button>
             <p className="fine-print">
-              This server has no single sign-on set up, so nobody checks this address. That is fine on your own machine;
-              see the README to connect your company’s Google or Microsoft accounts before sharing it.
+              {auth.providers.length > 0
+                ? 'Nobody checks this address: keep this way of signing in for your own machine.'
+                : 'Nobody checks this address, which is fine on your own machine. To sign in with Google or Microsoft accounts, see “Sign-in” in the README.'}
             </p>
           </form>
         )}

@@ -41,7 +41,7 @@ describe('accounts and board permissions', () => {
   it('needs a session for everything but /api/me', async () => {
     expect((await call(base, null, 'GET', '/api/boards')).status).toBe(401)
     const me = await call(base, null, 'GET', '/api/me')
-    expect(me.json).toMatchObject({ user: null, auth: { mode: 'local' } })
+    expect(me.json).toMatchObject({ user: null, auth: { local: true, providers: [] } })
     const signedIn = await call(base, owner, 'GET', '/api/me')
     expect(signedIn.json.user).toMatchObject({ name: 'Olivia', email: 'olivia@example.com' })
   })

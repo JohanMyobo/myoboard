@@ -22,8 +22,8 @@ don't publish packages or releases unless the user asks.
    installer) rather than working around it.
 2. `npm ci`
 3. `npm start -- --host 127.0.0.1`, as a background task: it builds, then
-   serves the app and sync on http://localhost:3000. Without `OIDC_*`
-   variables, sign-in asks for a name and an email (any will do); `/` then
+   serves the app and sync on http://localhost:3000. With no sign-in brick
+   set up, sign-in asks for a name and an email (any will do); `/` then
    lists your boards and boards open at `/b/<id>`.
 4. `npm run health` waits until the server answers on `/healthz` (add
    `-- --port <n>` if you changed the port). Use it rather than curl: it is
@@ -54,10 +54,14 @@ wins over its variable, and variables can sit in a `.env` file where the
 server starts (`.env.example`; git- and docker-ignored: never commit it,
 never print the secret it holds). `npm run dev` and the end-to-end tests
 pass `--no-env-file`, so they keep name-and-email sign-in whatever `.env`
-says; `npm start` and Docker use it. Sign-in through a company's accounts takes
-`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` and optionally
-`OIDC_ALLOWED_DOMAINS`, `OIDC_PROVIDER_NAME` (README.md, "Sign in with your
-company's accounts"). In npm scripts, put flags after `--`.
+says; `npm start` and Docker use it. Sign-in bricks, each optional and
+combinable (README.md, "Sign-in"): Google (`GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, optional `GOOGLE_ALLOWED_DOMAINS`), any OpenID
+Connect provider (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`,
+optional `OIDC_ALLOWED_DOMAINS`, `OIDC_PROVIDER_NAME`), and name and email
+(`LOCAL_SIGN_IN`, on by default only without a provider). A brick filled in
+halfway stops the server with a message naming what is missing. In npm
+scripts, put flags after `--`.
 
 One test at a time: `npx vitest run src/model`,
 `npx playwright test -g "pen strokes"`.
@@ -162,11 +166,14 @@ Dockerfile, compose.yaml   the container image and how to run it
 
 ## Accounts and permissions
 
-- A user is an email address (lowercased) with a name and a colour. In OIDC
-  mode the identity provider vouches for the email; in local mode (no
-  `OIDC_*`), anyone types any name and email. With Google and allowed
-  domains, the account must also be managed by one of them (`hd` claim):
-  a personal Google account can carry a company address.
+- A user is an email address (lowercased) with a name and a colour. The
+  same email is the same account, whichever way it signs in. Identity
+  providers (`AuthOptions.providers`, built from the environment in
+  `index.ts`) vouch for the email; name-and-email sign-in (`localSignIn`)
+  lets anyone type any address. All providers share `/auth/callback`: the
+  pending login remembers which one was picked. With Google and allowed
+  domains, the account must also be managed by one of them (`hd` claim): a
+  personal Google account can carry a company address.
 - A board belongs to its creator (owner). Invitations are by email with a
   role, editor or viewer, and work before the person ever signs in. Link
   access (`none`, `view`, `edit`, default `edit`) is what anyone signed in

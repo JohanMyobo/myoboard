@@ -5,7 +5,7 @@ test('sign in, find your boards, create and delete one', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await page.getByLabel('Your name').fill('Rosa Parks')
-  await page.getByLabel('Work email').fill(`rosa.${Date.now().toString(36)}@example.com`)
+  await page.getByLabel('Email').fill(`rosa.${Date.now().toString(36)}@example.com`)
   await page.getByRole('button', { name: 'Continue' }).click()
 
   await expect(page.getByRole('heading', { name: 'Boards' })).toBeVisible()
@@ -30,6 +30,22 @@ test('sign in, find your boards, create and delete one', async ({ page }) => {
   await page.getByRole('button', { name: /Signed in as/ }).click()
   await page.getByRole('menuitem', { name: 'Sign out' }).click()
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+})
+
+test('the sign-in page offers every way the server has set up', async ({ page }) => {
+  const auth = { local: true, providers: [{ id: 'google', name: 'Google' }, { id: 'oidc', name: 'Microsoft' }] }
+  await page.route('**/api/me', (route) => route.fulfill({ json: { user: null, auth } }))
+  await page.goto('/b/some-board')
+  await expect(page.getByRole('link', { name: 'Continue with Google' })).toHaveAttribute('href', '/auth/login?provider=google&next=%2Fb%2Fsome-board')
+  await expect(page.getByRole('link', { name: 'Continue with Microsoft' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Continue with name and email' })).toBeVisible()
+
+  // Name-and-email sign-in turned off: only the providers remain.
+  await page.unroute('**/api/me')
+  await page.route('**/api/me', (route) => route.fulfill({ json: { user: null, auth: { ...auth, local: false } } }))
+  await page.reload()
+  await expect(page.getByRole('link', { name: 'Continue with Google' })).toBeVisible()
+  await expect(page.getByLabel('Email')).toHaveCount(0)
 })
 
 test('owners decide who can view or edit, and changes apply live', async ({ browser }, info) => {

@@ -26,8 +26,9 @@ time between everyone on the same board.
 - **Resilient**: every board is saved on the server and kept in the browser
   (IndexedDB), so it opens instantly and keeps working through a dropped
   connection.
-- **Accounts and permissions**: sign in with your company's Google or
-  Microsoft account (OpenID Connect). Each board has an owner who invites
+- **Accounts and permissions**: sign in with a name and an email out of the
+  box, or turn on Google (personal or Workspace accounts), Microsoft or any
+  OpenID Connect provider, alone or together. Each board has an owner who invites
   people as editors or viewers and decides what the link gives everyone
   else: nothing, viewing or editing. Viewers see changes live but can
   change nothing, enforced by the server.
@@ -57,7 +58,7 @@ approved: leave them so, nothing needs them (both ship ready-made binaries).
 `npm start` builds the app and serves it, with real-time sync, on
 <http://localhost:3000>. Without further setup you sign in with a name and an
 email, which nobody checks: fine to try it on your machine. Before sharing
-the server, connect your company's accounts (next section).
+the server, turn on a real sign-in such as Google (see Sign-in below).
 
 | Flag           | Variable     | Default   | Purpose                                                   |
 | -------------- | ------------ | --------- | --------------------------------------------------------- |
@@ -84,49 +85,56 @@ docker compose up -d
 ```
 
 builds the image and serves Myoboard on <http://localhost:3000>, with its
-data in a Docker volume (`/data` in the container). Edit `compose.yaml` to
-set `PUBLIC_URL` and the `OIDC_*` variables below, and put HTTPS in front
-of it (a reverse proxy such as Caddy, nginx or your company's load
+data in a Docker volume (`/data` in the container). Settings come from the
+same `.env` file as below (Sign-in). Put HTTPS in front of it (a reverse proxy such as Caddy, nginx or your company's load
 balancer). The image runs as an unprivileged user and reports its health
 on `/healthz`.
 
-### Sign in with your company's accounts
+### Sign-in
 
-Myoboard speaks OpenID Connect, so it works with Google Workspace, Microsoft
-Entra ID (Office 365) or any other OIDC provider. Nobody has a password to
-manage. Register Myoboard as a web application with your provider, with
-`<PUBLIC_URL>/auth/callback` as the redirect URI, then set these variables,
-in the environment or in a `.env` file next to `package.json` (copy
-[`.env.example`](.env.example); it is git-ignored, so the secret never
-reaches the repository):
+Out of the box, people sign in with a name and an email, which nobody
+checks: fine on your own machine. Each other way of signing in is an
+optional brick you turn on when you need it, and they combine: the sign-in
+page shows a button for each one set up. The same email is the same
+account, whichever way it signs in.
 
-| Variable               | Purpose                                                                 |
-| ---------------------- | ----------------------------------------------------------------------- |
-| `OIDC_ISSUER`          | Google: `https://accounts.google.com`; Microsoft: `https://login.microsoftonline.com/<tenant id>/v2.0` |
-| `OIDC_CLIENT_ID`       | From your provider                                                      |
-| `OIDC_CLIENT_SECRET`   | From your provider                                                      |
-| `OIDC_ALLOWED_DOMAINS` | Optional, comma-separated: only these email domains get in, e.g. `example.com` |
-| `OIDC_PROVIDER_NAME`   | Optional: the sign-in button says "Continue with …"; guessed for Google and Microsoft |
-| `PUBLIC_URL`           | The address people use; it must match the redirect URI you registered  |
+Settings go in the environment or in a `.env` file next to `package.json`:
+copy [`.env.example`](.env.example), which is git-ignored, so secrets never
+reach the repository. `npm start` and Docker Compose read it. Restart the
+server after changing it.
 
-- **Google Workspace**: in the [Google Cloud console](https://console.cloud.google.com),
-  signed in with a company account, pick or create a project in your
-  company's organization and open *Google Auth Platform*. Give the app a
-  name, choose the *Internal* audience (only your Workspace accounts; if the
-  option is missing, the project is outside the organization), then
-  *Clients → Create client → Web application* with the redirect URI
-  `<PUBLIC_URL>/auth/callback`; for a first try on your machine,
-  `http://localhost:3000/auth/callback`, opening Myoboard at
-  `http://localhost:3000`. Copy the client ID and secret into `.env`, with
-  your domain in `OIDC_ALLOWED_DOMAINS`: Myoboard then only lets in accounts
-  managed by that Workspace domain (Google's `hd` claim), not a personal
-  Google account opened with a company address.
-- **Microsoft**: in the Entra admin centre, *App registrations → New
-  registration*, single tenant, redirect URI of type *Web*; then create a
-  client secret under *Certificates & secrets*.
+| Brick | Variables | Notes |
+| --- | --- | --- |
+| Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, optional `GOOGLE_ALLOWED_DOMAINS` | Personal or work Google accounts; with domains, only accounts managed by those Google Workspace domains |
+| Any OpenID Connect provider | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, optional `OIDC_ALLOWED_DOMAINS`, `OIDC_PROVIDER_NAME` | Microsoft Entra ID (`https://login.microsoftonline.com/<tenant id>/v2.0`), Okta, Keycloak… |
+| Name and email | `LOCAL_SIGN_IN=on` or `off` | On by default when no provider is set up, off otherwise; `on` keeps it next to a provider |
 
-With a single-tenant Microsoft app or an internal Google app, only your
-company's accounts can sign in; `OIDC_ALLOWED_DOMAINS` adds a second check.
+Every provider sends people back to `<PUBLIC_URL>/auth/callback`: register
+that address with it, and set `PUBLIC_URL` to the address people use (for a
+first try on your machine, `http://localhost:3000`, and open Myoboard at
+exactly that address).
+
+**Google**: in the [Google Cloud console](https://console.cloud.google.com),
+create a project and open *Google Auth Platform*. Give the app a name, then
+pick its audience:
+
+- *Internal*: only your company's Google Workspace accounts. The project
+  must belong to your company's organization (sign in with your work
+  account; your Workspace administrator may have to allow it). Set
+  `GOOGLE_ALLOWED_DOMAINS` to your domain as well: Myoboard then also
+  refuses a personal Google account opened with a company address.
+- *External*: any Google account, personal ones included. While the app is
+  in *Testing*, only the test users you list can sign in; publish it to
+  open it to everyone (sign-in only asks for the name and email, which
+  needs no review from Google).
+
+Then *Clients → Create client → Web application*, with the redirect URI
+above, and copy the client ID and secret into `.env`.
+
+**Microsoft**: in the Entra admin centre, *App registrations → New
+registration*, single tenant, redirect URI of type *Web*; then create a
+client secret under *Certificates & secrets*, and fill in the `OIDC_`
+variables.
 
 ## Keyboard shortcuts
 
@@ -228,8 +236,10 @@ feature matrix and parity score are in [`replica/`](replica).
 - Sessions are random tokens in an `HttpOnly`, `SameSite=Lax` cookie
   (`Secure` when `PUBLIC_URL` is https), stored hashed. Requests that change
   something, and WebSocket connections, must come from the app's own origin.
-- Without OIDC, anyone can sign in as anyone: keep such a server on your
-  own machine. The server warns when it listens on the network that way.
+- With name-and-email sign-in on, anyone can sign in as anyone: keep it to
+  your own machine, and turn it off (`LOCAL_SIGN_IN=off`, the default once
+  a provider is set up) on a shared server. The server warns when it
+  listens on the network that way.
 - An editor can change anything on a board, as on any whiteboard.
 - Put the server behind HTTPS (a reverse proxy) when it leaves your laptop.
 

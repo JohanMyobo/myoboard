@@ -11,9 +11,10 @@ export type Role = 'owner' | 'editor' | 'viewer'
 export type LinkAccess = 'none' | 'view' | 'edit'
 export type MemberRole = 'editor' | 'viewer'
 
+/** The ways to sign in on this server: name and email, and/or identity providers. */
 export interface AuthInfo {
-  mode: 'local' | 'oidc'
-  providerName: string | null
+  local: boolean
+  providers: { id: string; name: string }[]
 }
 
 export interface BoardInfo {
