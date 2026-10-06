@@ -14,6 +14,13 @@ export interface OidcOptions {
   providerName?: string
   /** Only these email domains may sign in; empty lets in anyone the provider accepts. */
   allowedDomains?: string[]
+  /**
+   * Google Workspace: also require the account to be managed by one of the
+   * allowed domains (the `hd` claim). Without it, a personal Google account
+   * opened with a company address would get in. On by default for Google
+   * when allowed domains are set.
+   */
+  requireHostedDomain?: boolean
   /** Accept an http:// issuer: a local identity provider, or the tests. */
   allowHttp?: boolean
 }
@@ -50,6 +57,7 @@ const text = (value: unknown): string | undefined => (typeof value === 'string' 
  */
 export class Auth {
   readonly info: AuthInfo
+  private readonly hostedDomain: boolean
   private config: Promise<oidc.Configuration> | null = null
   private readonly pending = new Map<string, { verifier: string; nonce: string; next: string; expires: number }>()
 
@@ -61,6 +69,8 @@ export class Auth {
     this.info = settings
       ? { mode: 'oidc', providerName: settings.providerName || providerNameFor(settings.issuer) }
       : { mode: 'local', providerName: null }
+    const domains = settings?.allowedDomains ?? []
+    this.hostedDomain = !!settings && domains.length > 0 && (settings.requireHostedDomain ?? new URL(settings.issuer).host === 'accounts.google.com')
   }
 
   get publicUrl(): string | null {
@@ -124,7 +134,7 @@ export class Auth {
     const state = oidc.randomState()
     const nonce = oidc.randomNonce()
     this.pending.set(state, { verifier, nonce, next, expires: now + PENDING_TTL_MS })
-    const target = oidc.buildAuthorizationUrl(config, {
+    const params: Record<string, string> = {
       redirect_uri: this.callbackUrl(req),
       scope: 'openid email profile',
       code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
@@ -132,7 +142,11 @@ export class Auth {
       state,
       nonce,
       prompt: 'select_account',
-    })
+    }
+    // Google then only offers the company's accounts (a hint; the check is below).
+    const domains = this.options.oidc?.allowedDomains ?? []
+    if (this.hostedDomain && domains.length === 1) params.hd = domains[0]
+    const target = oidc.buildAuthorizationUrl(config, params)
     redirect(res, target.href)
   }
 
@@ -167,6 +181,9 @@ export class Auth {
     const domain = email.split('@')[1].toLowerCase()
     const allowed = this.options.oidc?.allowedDomains ?? []
     if (allowed.length > 0 && !allowed.includes(domain)) return fail(`Accounts from ${domain} cannot use this server`)
+    if (this.hostedDomain && !allowed.includes(text(claims?.hd)?.toLowerCase() ?? '')) {
+      return fail(`Sign in with your ${allowed.join(' or ')} work account, not a personal one`)
+    }
     const name = text(claims?.name) ?? ([text(claims?.given_name), text(claims?.family_name)].filter(Boolean).join(' ') || email.split('@')[0])
 
     const user = this.store.upsertUser({ email, name })

@@ -30,7 +30,7 @@ export default defineConfig({
     command: [
       `node -e "require('node:fs').rmSync('.e2e-data', { recursive: true, force: true })"`,
       'npm run build',
-      `npm run serve -- --port ${PORT} --host 127.0.0.1 --data-dir .e2e-data`,
+      `npm run serve -- --port ${PORT} --host 127.0.0.1 --data-dir .e2e-data --no-env-file`,
     ].join(' && '),
     url: `${ORIGIN}/healthz`,
     reuseExistingServer: false,

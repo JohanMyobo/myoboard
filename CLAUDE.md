@@ -50,7 +50,11 @@ experiments at a scratch folder with `--data-dir`.
 
 Server options: `--port` / `PORT` (3000), `--host` / `HOST` (0.0.0.0),
 `--data-dir` / `DATA_DIR` (`./data`), `--public-url` / `PUBLIC_URL`; a flag
-wins over its variable. Sign-in through a company's accounts takes
+wins over its variable, and variables can sit in a `.env` file where the
+server starts (`.env.example`; git- and docker-ignored: never commit it,
+never print the secret it holds). `npm run dev` and the end-to-end tests
+pass `--no-env-file`, so they keep name-and-email sign-in whatever `.env`
+says; `npm start` and Docker use it. Sign-in through a company's accounts takes
 `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` and optionally
 `OIDC_ALLOWED_DOMAINS`, `OIDC_PROVIDER_NAME` (README.md, "Sign in with your
 company's accounts"). In npm scripts, put flags after `--`.
@@ -160,7 +164,9 @@ Dockerfile, compose.yaml   the container image and how to run it
 
 - A user is an email address (lowercased) with a name and a colour. In OIDC
   mode the identity provider vouches for the email; in local mode (no
-  `OIDC_*`), anyone types any name and email.
+  `OIDC_*`), anyone types any name and email. With Google and allowed
+  domains, the account must also be managed by one of them (`hd` claim):
+  a personal Google account can carry a company address.
 - A board belongs to its creator (owner). Invitations are by email with a
   role, editor or viewer, and work before the person ever signs in. Link
   access (`none`, `view`, `edit`, default `edit`) is what anyone signed in

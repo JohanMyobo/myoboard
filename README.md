@@ -95,7 +95,10 @@ on `/healthz`.
 Myoboard speaks OpenID Connect, so it works with Google Workspace, Microsoft
 Entra ID (Office 365) or any other OIDC provider. Nobody has a password to
 manage. Register Myoboard as a web application with your provider, with
-`<PUBLIC_URL>/auth/callback` as the redirect URI, then set:
+`<PUBLIC_URL>/auth/callback` as the redirect URI, then set these variables,
+in the environment or in a `.env` file next to `package.json` (copy
+[`.env.example`](.env.example); it is git-ignored, so the secret never
+reaches the repository):
 
 | Variable               | Purpose                                                                 |
 | ---------------------- | ----------------------------------------------------------------------- |
@@ -106,9 +109,18 @@ manage. Register Myoboard as a web application with your provider, with
 | `OIDC_PROVIDER_NAME`   | Optional: the sign-in button says "Continue with …"; guessed for Google and Microsoft |
 | `PUBLIC_URL`           | The address people use; it must match the redirect URI you registered  |
 
-- **Google**: in Google Cloud Console, *APIs & Services → Credentials →
-  Create OAuth client ID → Web application*. Set the consent screen to
-  *Internal* so only your Workspace accounts can sign in.
+- **Google Workspace**: in the [Google Cloud console](https://console.cloud.google.com),
+  signed in with a company account, pick or create a project in your
+  company's organization and open *Google Auth Platform*. Give the app a
+  name, choose the *Internal* audience (only your Workspace accounts; if the
+  option is missing, the project is outside the organization), then
+  *Clients → Create client → Web application* with the redirect URI
+  `<PUBLIC_URL>/auth/callback`; for a first try on your machine,
+  `http://localhost:3000/auth/callback`, opening Myoboard at
+  `http://localhost:3000`. Copy the client ID and secret into `.env`, with
+  your domain in `OIDC_ALLOWED_DOMAINS`: Myoboard then only lets in accounts
+  managed by that Workspace domain (Google's `hd` claim), not a personal
+  Google account opened with a company address.
 - **Microsoft**: in the Entra admin centre, *App registrations → New
   registration*, single tenant, redirect URI of type *Web*; then create a
   client secret under *Certificates & secrets*.

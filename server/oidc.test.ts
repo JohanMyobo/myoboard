@@ -137,3 +137,49 @@ describe('single sign-on (OpenID Connect)', () => {
     expect(location).toBe('/')
   })
 })
+
+describe('single sign-on with Google Workspace', () => {
+  let provider: Awaited<ReturnType<typeof startProvider>>
+  let running: Running
+  let claims: Record<string, unknown>
+
+  beforeEach(async () => {
+    claims = { email: 'ada@example.com', email_verified: true, name: 'Ada Lovelace', hd: 'example.com' }
+    provider = await startProvider(() => claims)
+    running = await startApp({
+      auth: {
+        oidc: {
+          issuer: provider.issuer,
+          clientId: 'myoboard',
+          clientSecret: 'top-secret',
+          allowHttp: true,
+          allowedDomains: ['example.com'],
+          requireHostedDomain: true,
+        },
+      },
+    })
+  })
+
+  afterEach(async () => {
+    await running.close()
+    await provider.close()
+  })
+
+  it('lets in accounts the company manages', async () => {
+    const { location, cookie } = await signInThroughProvider(running.base)
+    expect(location).toBe('/b/some-board')
+    expect((await call(running.base, cookie, 'GET', '/api/me')).json.user).toMatchObject({ email: 'ada@example.com' })
+  })
+
+  it('turns away a personal Google account that uses a company address', async () => {
+    claims = { email: 'ada@example.com', email_verified: true, name: 'Ada Lovelace' } // no hd: not managed by the company
+    const { location, cookie } = await signInThroughProvider(running.base)
+    expect(decodeURIComponent(location)).toContain('work account')
+    expect(cookie).toBeNull()
+  })
+
+  it('asks Google to offer only the company accounts', async () => {
+    const start = await fetch(`${running.base}/auth/login`, { redirect: 'manual' })
+    expect(new URL(start.headers.get('location')!).searchParams.get('hd')).toBe('example.com')
+  })
+})

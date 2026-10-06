@@ -1,6 +1,7 @@
 # docker compose up -d   then open http://localhost:3000
-# Put HTTPS in front (a reverse proxy) before sharing it, and set the
-# OIDC_* variables so people sign in with the company's accounts.
+# Settings (PUBLIC_URL, sign-in with your company's accounts) come from a
+# .env file next to this one: copy .env.example. Put HTTPS in front (a
+# reverse proxy) before sharing the server.
 services:
   myoboard:
     build: .
@@ -9,12 +10,9 @@ services:
       - "3000:3000"
     volumes:
       - myoboard-data:/data
-    environment:
-      PUBLIC_URL: http://localhost:3000
-      # OIDC_ISSUER: https://accounts.google.com
-      # OIDC_CLIENT_ID: your-client-id
-      # OIDC_CLIENT_SECRET: your-client-secret
-      # OIDC_ALLOWED_DOMAINS: example.com
+    env_file:
+      - path: .env
+        required: false
     restart: unless-stopped
 
 volumes:
