@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { nanoid } from 'nanoid'
+import { customAlphabet, nanoid } from 'nanoid'
 import type { Auth } from './auth'
 import { MAX_ASSET_BYTES, contentTypeOf, parseAssetUrl } from './assets'
 import type { AssetStore } from './assets'
@@ -21,6 +21,8 @@ const RANK: Record<Role, number> = { viewer: 1, editor: 2, owner: 3 }
 /** Images saved with a team template live under this pseudo-board, readable by everyone signed in. */
 const TEMPLATE_MEDIA = '_t_'
 const templateMedia = (templateId: string) => `${TEMPLATE_MEDIA}${templateId}`
+/** Letters and digits only: ids starting with `_` are reserved, and these read well in links. */
+const newBoardId = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 10)
 const MAX_TEMPLATE_BYTES = 5 * 1024 * 1024
 const MAX_TEMPLATE_OBJECTS = 2000
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -125,7 +127,7 @@ export function createApi({ store, auth, rooms, assets }: ApiDeps) {
       }
       if (method === 'POST') {
         const body = await readJson(req)
-        const id = body.id === undefined ? nanoid(10) : body.id
+        const id = body.id === undefined ? newBoardId() : body.id
         if (typeof id !== 'string' || !isValidRoomName(id) || id.startsWith('_')) throw new HttpError(400, 'Invalid board id')
         const file = rooms.fileFor(id)
         if (store.getBoard(id) || (file && fs.existsSync(file))) throw new HttpError(409, 'A board with this id already exists')

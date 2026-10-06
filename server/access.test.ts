@@ -213,8 +213,10 @@ describe('accounts and board permissions', () => {
     expect(copied.status).toBe(201)
   })
 
-  it('reserves board ids starting with an underscore', async () => {
+  it('reserves board ids starting with an underscore, and never generates one', async () => {
     expect((await call(base, owner, 'POST', '/api/boards', { id: '_t_sneaky' })).status).toBe(400)
+    // Random ids once started with `_` about one time in 64, and were refused.
+    for (let i = 0; i < 300; i++) expect((await call(base, owner, 'POST', '/api/boards', {})).status).toBe(201)
   })
 
   it('shares team templates with everyone, and lets their author delete them', async () => {
