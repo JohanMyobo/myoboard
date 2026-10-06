@@ -7,10 +7,11 @@ import { Canvas, EDITABLE } from './canvas/Canvas'
 import { PeerCursors } from './canvas/PeerCursors'
 import { TextEditor } from './canvas/TextEditor'
 import type { EditableObject } from './canvas/TextEditor'
-import { fitBox, zoomAt } from './canvas/camera'
+import { fitBox, toScreen, zoomAt } from './canvas/camera'
 import type { Camera } from './canvas/camera'
 import { contentBounds, downloadDataUrl, fileNameFor, renderBoardPng } from './canvas/exportPng'
 import { useBoardSnapshot, useConnectionStatus, useElementSize, usePeers } from './hooks'
+import { objectBounds, unionBoxes } from './model/geometry'
 import { loadIdentity, saveIdentity } from './sync/identity'
 import type { Identity } from './sync/identity'
 import { openBoardSession } from './sync/session'
@@ -333,6 +334,21 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
     () => selection.flatMap((id) => snapshot.byId.get(id) ?? []),
     [selection, snapshot],
   )
+  // The context bar floats just above the selection (or below it, near the top edge).
+  const selectionBox = useMemo(() => {
+    const lookup = (id: string) => snapshot.byId.get(id)
+    return unionBoxes(selectedObjects.flatMap((obj) => objectBounds(obj, lookup) ?? []))
+  }, [selectedObjects, snapshot])
+  const contextBarAt = (() => {
+    if (!selectionBox) return null
+    const topLeft = toScreen(camera, { x: selectionBox.x, y: selectionBox.y })
+    const bottom = topLeft.y + selectionBox.h * camera.scale
+    const centerX = topLeft.x + (selectionBox.w * camera.scale) / 2
+    const above = topLeft.y - 62
+    const y = above > 70 ? above : Math.min(bottom + 14, size.height - 60)
+    const margin = Math.min(260, size.width / 2)
+    return { x: Math.min(Math.max(centerX, margin), size.width - margin), y }
+  })()
   const editing = editingId ? snapshot.byId.get(editingId) : undefined
   const editingObj = editing && EDITABLE.has(editing.type) ? (editing as EditableObject) : null
 
@@ -401,7 +417,9 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
         onNewBoard={() => window.location.assign(`/b/${nanoid(10)}`)}
       />
       <Toolbar tool={tool} options={options} onToolChange={setTool} onOptionsChange={(patch) => setOptions((o) => ({ ...o, ...patch }))} />
-      {!editingId && <ContextBar board={board} selected={selectedObjects} onDuplicate={duplicate} onDelete={remove} />}
+      {!editingId && !panning && contextBarAt && (
+        <ContextBar board={board} selected={selectedObjects} position={contextBarAt} onDuplicate={duplicate} onDelete={remove} />
+      )}
       <ZoomControls
         scale={camera.scale}
         onZoomIn={() => zoomAround((s) => s * 1.25)}

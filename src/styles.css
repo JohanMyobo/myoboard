@@ -397,8 +397,6 @@ kbd {
 
 .context-bar {
   position: absolute;
-  top: 70px;
-  left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -565,8 +563,9 @@ kbd {
   }
 
   .context-bar {
-    top: auto;
+    top: auto !important;
     bottom: 64px;
+    left: 50% !important;
   }
 
   .context-bar .swatches {

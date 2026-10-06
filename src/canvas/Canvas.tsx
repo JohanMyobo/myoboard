@@ -32,6 +32,8 @@ import type { NodeHandlers } from './nodes'
 
 /** An interaction in progress, drawn in the overlay layer until it is committed. */
 type Draft =
+  /** A click that places an object; it is created on release, so its editor keeps focus. */
+  | { kind: 'place'; tool: 'sticky' | 'text' | 'stamp'; at: Point }
   | { kind: 'marquee'; start: Point; end: Point; base: string[] }
   | { kind: 'shape' | 'section'; start: Point; end: Point }
   | { kind: 'pen'; origin: Point; points: number[] }
@@ -151,6 +153,8 @@ export function Canvas(props: CanvasProps) {
 
   const advanceDraft = (d: Draft, world: Point): Draft => {
     switch (d.kind) {
+      case 'place':
+        return d
       case 'marquee': {
         const area = normalizeBox(d.start, world)
         const { snapshot: snap, camera: cam } = latest.current
@@ -184,9 +188,47 @@ export function Canvas(props: CanvasProps) {
   }
 
   const finishDraft = (d: Draft) => {
-    const { camera: cam, options, identity, snapshot: snap, setTool } = latest.current
+    const { camera: cam, options, identity, snapshot: snap, setTool, setEditingId } = latest.current
     const author = identity.name
     switch (d.kind) {
+      case 'place':
+        if (d.tool === 'sticky') {
+          const side = DEFAULT_SIZES.sticky
+          const id = board.create({
+            type: 'sticky',
+            x: round1(d.at.x - side / 2),
+            y: round1(d.at.y - side / 2),
+            w: side,
+            h: side,
+            color: options.stickyColor,
+            text: '',
+            author,
+          })
+          board.checkpoint()
+          selectNow([id])
+          setTool('select')
+          setEditingId(id)
+        } else if (d.tool === 'text') {
+          const fontSize = DEFAULT_SIZES.textFontSize
+          const id = board.create({
+            type: 'text',
+            x: round1(d.at.x),
+            y: round1(d.at.y - fontSize * 0.65),
+            w: DEFAULT_SIZES.textWidth,
+            text: '',
+            fontSize,
+            color: INK,
+            author,
+          })
+          board.checkpoint()
+          selectNow([id])
+          setTool('select')
+          setEditingId(id)
+        } else {
+          board.create({ type: 'stamp', x: round1(d.at.x), y: round1(d.at.y), emoji: options.stamp, color: identity.color, author })
+          board.checkpoint()
+        }
+        return
       case 'marquee':
         return
       case 'shape': {
@@ -266,7 +308,7 @@ export function Canvas(props: CanvasProps) {
 
   const onStagePointerDown = (e: KonvaEventObject<PointerEvent>) => {
     const evt = e.evt
-    const { tool: currentTool, panKey: spaceHeld, camera: cam, options, identity, snapshot: snap, setTool, setEditingId } = latest.current
+    const { tool: currentTool, panKey: spaceHeld, camera: cam, snapshot: snap } = latest.current
     if (evt.button === 1 || (evt.button === 0 && (currentTool === 'hand' || spaceHeld))) {
       evt.preventDefault()
       beginPan(evt)
@@ -274,7 +316,6 @@ export function Canvas(props: CanvasProps) {
     }
     if (evt.button !== 0) return
     const world = toWorld(cam, screenPoint(evt))
-    const author = identity.name
     const onObject = e.target !== e.target.getStage() && !!e.target.findAncestor('.object', true)
 
     switch (currentTool) {
@@ -283,42 +324,11 @@ export function Canvas(props: CanvasProps) {
         if (!evt.shiftKey) selectNow([])
         beginDraft({ kind: 'marquee', start: world, end: world, base: evt.shiftKey ? selectionRef.current : [] })
         return
-      case 'sticky': {
-        const side = DEFAULT_SIZES.sticky
-        const id = board.create({
-          type: 'sticky',
-          x: round1(world.x - side / 2),
-          y: round1(world.y - side / 2),
-          w: side,
-          h: side,
-          color: options.stickyColor,
-          text: '',
-          author,
-        })
-        board.checkpoint()
-        selectNow([id])
-        setTool('select')
-        setEditingId(id)
+      case 'sticky':
+      case 'text':
+      case 'stamp':
+        beginDraft({ kind: 'place', tool: currentTool, at: world })
         return
-      }
-      case 'text': {
-        const fontSize = DEFAULT_SIZES.textFontSize
-        const id = board.create({
-          type: 'text',
-          x: round1(world.x),
-          y: round1(world.y - fontSize * 0.65),
-          w: DEFAULT_SIZES.textWidth,
-          text: '',
-          fontSize,
-          color: INK,
-          author,
-        })
-        board.checkpoint()
-        selectNow([id])
-        setTool('select')
-        setEditingId(id)
-        return
-      }
       case 'shape':
       case 'section':
         beginDraft({ kind: currentTool, start: world, end: world })
@@ -331,10 +341,6 @@ export function Canvas(props: CanvasProps) {
         beginDraft({ kind: 'connector', from: hit ? { id: hit.id } : { x: round1(world.x), y: round1(world.y) }, end: world, hoverId: null })
         return
       }
-      case 'stamp':
-        board.create({ type: 'stamp', x: round1(world.x), y: round1(world.y), emoji: options.stamp, color: identity.color, author })
-        board.checkpoint()
-        return
       case 'hand':
         return
     }
@@ -414,10 +420,10 @@ export function Canvas(props: CanvasProps) {
     [board],
   )
 
-  // Share where the pointer is, so others see a live cursor.
+  // Share where the pointer is, so others see a live cursor. It is tracked
+  // over the whole window (panels included) and hidden only when it leaves.
   useEffect(() => {
-    const container = stageRef.current?.container()
-    if (!container) return
+    const root = document.documentElement
     let last = 0
     let timer = 0
     let pending: Point | null = null
@@ -439,11 +445,13 @@ export function Canvas(props: CanvasProps) {
       pending = null
       awareness.setLocalStateField('cursor', null)
     }
-    container.addEventListener('pointermove', onMove)
-    container.addEventListener('pointerleave', onLeave)
+    window.addEventListener('pointermove', onMove)
+    root.addEventListener('pointerleave', onLeave)
+    window.addEventListener('blur', onLeave)
     return () => {
-      container.removeEventListener('pointermove', onMove)
-      container.removeEventListener('pointerleave', onLeave)
+      window.removeEventListener('pointermove', onMove)
+      root.removeEventListener('pointerleave', onLeave)
+      window.removeEventListener('blur', onLeave)
       if (timer) clearTimeout(timer)
     }
   }, [awareness, stageRef])
@@ -551,6 +559,8 @@ export function Canvas(props: CanvasProps) {
   const draftShape = (() => {
     if (!draft) return null
     switch (draft.kind) {
+      case 'place':
+        return null
       case 'marquee': {
         const box = normalizeBox(draft.start, draft.end)
         return <Rect {...box} width={box.w} height={box.h} fill="rgba(37,99,235,0.08)" stroke={ACCENT} strokeWidth={1 / s} />

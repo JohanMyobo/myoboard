@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent } from 'react'
 import { INK, LINE_HEIGHT, textColorOn } from '../model/palette'
 import { STICKY_PADDING, fitFontSize, stickyTextBox } from '../model/geometry'
@@ -21,15 +21,13 @@ export function TextEditor({ obj, camera, onChange, onClose }: TextEditorProps) 
   const [value, setValue] = useState(obj.type === 'section' ? obj.title : obj.text)
   const fieldRef = useRef<HTMLTextAreaElement & HTMLInputElement>(null)
 
-  // Focus after the click that opened the editor has finished moving focus around.
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const field = fieldRef.current
-      if (!field) return
-      field.focus()
-      field.setSelectionRange(field.value.length, field.value.length)
-    }, 0)
-    return () => clearTimeout(timer)
+  // Focus at once, so nothing typed right after the click is lost. Objects are
+  // created when the click is released, after the browser has moved focus.
+  useLayoutEffect(() => {
+    const field = fieldRef.current
+    if (!field) return
+    field.focus()
+    field.setSelectionRange(field.value.length, field.value.length)
   }, [])
 
   useLayoutEffect(() => {

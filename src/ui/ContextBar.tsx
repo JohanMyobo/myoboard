@@ -7,6 +7,8 @@ import { ShapeKindPicker, Swatches } from './Swatches'
 interface ContextBarProps {
   board: Board
   selected: BoardObject[]
+  /** Screen position of the bar's top centre. */
+  position: { x: number; y: number }
   onDuplicate(): void
   onDelete(): void
 }
@@ -19,7 +21,7 @@ const PALETTES = {
 } as const
 
 /** Actions for the current selection: colour, shape, order, duplicate, delete. */
-export function ContextBar({ board, selected, onDuplicate, onDelete }: ContextBarProps) {
+export function ContextBar({ board, selected, position, onDuplicate, onDelete }: ContextBarProps) {
   if (selected.length === 0) return null
   const types = new Set(selected.map((obj) => obj.type))
   const onlyType = types.size === 1 ? selected[0].type : null
@@ -42,7 +44,7 @@ export function ContextBar({ board, selected, onDuplicate, onDelete }: ContextBa
   }
 
   return (
-    <div className="panel context-bar" role="toolbar" aria-label="Selection">
+    <div className="panel context-bar" role="toolbar" aria-label="Selection" style={{ left: position.x, top: position.y }}>
       <span className="context-count">{selected.length === 1 ? labelFor(selected[0]) : `${selected.length} selected`}</span>
       {onlyType === 'shape' && <ShapeKindPicker value={kinds.size === 1 ? [...kinds][0] : null} onChange={reshape} />}
       {palette && <Swatches colors={palette} value={currentColor} onChange={recolor} />}
