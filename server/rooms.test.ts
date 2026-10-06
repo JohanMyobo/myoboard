@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { AddressInfo } from 'node:net'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
@@ -51,6 +51,7 @@ describe('sync server', () => {
   })
 
   afterEach(async () => {
+    vi.restoreAllMocks()
     for (const p of providers.splice(0)) p.destroy()
     await new Promise((resolve) => app.server.close(resolve))
     fs.rmSync(dataDir, { recursive: true, force: true })
@@ -92,6 +93,28 @@ describe('sync server', () => {
     const later = connect(url, 'board-1')
     await synced(later.provider)
     await waitFor(() => later.doc.getMap('objects').get('kept') === 'yes')
+  })
+
+  it('keeps serving when a save fails, and saves once it can', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const a = connect(url, 'board-1')
+    await synced(a.provider)
+    // A file where the data folder should be makes every save fail.
+    fs.rmSync(dataDir, { recursive: true, force: true })
+    fs.writeFileSync(dataDir, 'not a folder')
+    a.doc.getMap('objects').set('kept', 'yes')
+    await waitFor(() => errors.mock.calls.length > 0)
+
+    const b = connect(url, 'board-1')
+    await waitFor(() => b.doc.getMap('objects').get('kept') === 'yes')
+
+    fs.rmSync(dataDir)
+    fs.mkdirSync(dataDir)
+    const file = path.join(dataDir, 'board-1.ybin')
+    await waitFor(() => fs.existsSync(file))
+    const saved = new Y.Doc()
+    Y.applyUpdate(saved, fs.readFileSync(file))
+    expect(saved.getMap('objects').get('kept')).toBe('yes')
   })
 
   it('refuses board ids that are not safe file names', async () => {

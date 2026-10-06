@@ -27,10 +27,10 @@ time between everyone on the same board.
 
 ## Run it
 
-Requires Node.js 22 or newer.
+Requires Node.js 22.12 or newer, on the 22 or 24 line.
 
 ```bash
-npm install
+npm ci
 npm start
 ```
 
@@ -38,11 +38,13 @@ npm start
 <http://localhost:3000>. Opening it creates a new board; share its address
 with anyone who can reach the machine.
 
-| Variable   | Default   | Purpose                                |
-| ---------- | --------- | -------------------------------------- |
-| `PORT`     | `3000`    | HTTP and WebSocket port                |
-| `HOST`     | `0.0.0.0` | Interface to listen on                 |
-| `DATA_DIR` | `./data`  | Where boards are saved (one file each) |
+| Flag         | Variable   | Default   | Purpose                                               |
+| ------------ | ---------- | --------- | ----------------------------------------------------- |
+| `--port`     | `PORT`     | `3000`    | HTTP and WebSocket port                               |
+| `--host`     | `HOST`     | `0.0.0.0` | Interface to listen on; `127.0.0.1` keeps it local    |
+| `--data-dir` | `DATA_DIR` | `./data`  | Where boards are saved (one file each)                |
+
+Pass flags after `--`, as in `npm start -- --port 4000`.
 
 For development, `npm run dev` runs Vite with hot reload on
 <http://localhost:5173> and the sync server on port 1234.
@@ -105,8 +107,18 @@ The end-to-end suite checks two people editing the same board live (edits,
 drags, cursors, presence), persistence across reloads and devices,
 connectors, sections and undo, pen strokes, shapes, stamps and PNG export,
 and frame times with 500 sticky notes. It needs a Chromium: run
-`npx playwright install chromium` once, or point `CHROMIUM_PATH` at an
-existing one.
+`npx playwright install chromium` once, set `PW_CHANNEL=chrome` or
+`PW_CHANNEL=msedge` to use an installed Chrome or Edge, or point
+`CHROMIUM_PATH` at any Chromium binary.
+
+## Working on it with Claude Code
+
+[`CLAUDE.md`](CLAUDE.md) gives Claude Code what it needs to work on the
+project: setup, commands, architecture, conventions, pitfalls and the
+clean-room rules. [`.claude/settings.json`](.claude/settings.json)
+pre-approves the install, build, run and test commands, once you accept the
+folder-trust prompt the first time you run `claude` in the repository (until
+then, Claude Code ignores the project's permissions).
 
 ## Clean-room build
 

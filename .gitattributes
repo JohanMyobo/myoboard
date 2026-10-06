@@ -1,0 +1,4 @@
+# Same line endings on every OS, so diffs stay clean when Windows checks out.
+* text=auto eol=lf
+*.png binary
+*.ybin binary

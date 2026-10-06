@@ -28,10 +28,11 @@ it, and none of its code, bundles, network traffic, assets, icons or copy.
 
 ## Feature matrix
 
-[`features.csv`](features.csv), scored in [`parity.md`](parity.md) with
-`parity.py` from the [Replica](https://github.com/Jakeschincariol/replica-skill)
-skills (MIT):
+[`features.csv`](features.csv), scored in [`parity.md`](parity.md) by
+[`parity.py`](parity.py), vendored from the
+[Replica](https://github.com/Jakeschincariol/replica-skill) skills (MIT).
+Python 3, standard library only:
 
 ```bash
-python3 parity.py replica/features.csv --markdown > replica/parity.md
+python3 replica/parity.py replica/features.csv --markdown > replica/parity.md
 ```

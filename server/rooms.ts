@@ -52,6 +52,7 @@ class Room {
   private saveTimer: NodeJS.Timeout | null = null
   private firstUnsavedAt = 0
   private dirty = false
+  private closed = false
 
   constructor(
     private readonly file: string | null,
@@ -101,11 +102,21 @@ class Room {
     if (!this.file || !this.dirty) return
     this.dirty = false
     const tmp = `${this.file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, Y.encodeStateAsUpdate(this.doc))
-    fs.renameSync(tmp, this.file)
+    try {
+      fs.mkdirSync(path.dirname(this.file), { recursive: true })
+      fs.writeFileSync(tmp, Y.encodeStateAsUpdate(this.doc))
+      fs.renameSync(tmp, this.file)
+    } catch (err) {
+      // A failed write (disk full, data folder removed, file briefly locked by
+      // an antivirus on Windows) must not take the server down: keep the edits
+      // and try again. A closed room gives up; its clients still hold the edits.
+      console.error(`[sync] could not save ${this.file}:`, err)
+      if (!this.closed) this.scheduleSave()
+    }
   }
 
   destroy(): void {
+    this.closed = true
     this.save()
     this.awareness.destroy()
     this.doc.destroy()

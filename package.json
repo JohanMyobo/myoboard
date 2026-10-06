@@ -6,13 +6,14 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
   },
   "scripts": {
-    "dev": "concurrently -k -n web,sync -c blue,magenta \"vite\" \"tsx watch server/index.ts --port 1234 --no-static\"",
+    "dev": "concurrently -k -n web,sync -c blue,magenta \"vite\" \"tsx watch server/index.ts --port 1234 --host 127.0.0.1 --no-static\"",
     "build": "vite build",
-    "start": "npm run build && npm run serve",
+    "start": "npm run build && tsx server/index.ts",
     "serve": "tsx server/index.ts",
+    "health": "tsx server/health.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:e2e": "playwright test",
