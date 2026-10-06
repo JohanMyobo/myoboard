@@ -4,7 +4,7 @@ An open-source, self-hostable collaborative whiteboard: sticky notes, shapes,
 connectors, sections, a pen, reaction stamps and live cursors, synced in real
 time between everyone on the same board.
 
-![Two people running a sprint retro on Myoboard](docs/screenshot.png)
+![Three people running a sprint retro on Myoboard: notes, a vote and its results, a shared timer, a comment and live cursors](docs/screenshot.png)
 
 ## Features
 
@@ -45,9 +45,13 @@ time between everyone on the same board.
 
 ## Run it
 
-Requires Node.js 22.13 or newer on the 22 line, 24, or 26 and newer.
+Requires Git and [Node.js](https://nodejs.org): the LTS version from
+nodejs.org is fine (precisely: 22.13 or newer on the 22 line, 24, or 26 and
+newer).
 
 ```bash
+git clone https://github.com/JohanMyobo/myoboard.git
+cd myoboard
 npm ci
 npm start
 ```
@@ -59,6 +63,16 @@ approved: leave them so, nothing needs them (both ship ready-made binaries).
 <http://localhost:3000>. Without further setup you sign in with a name and an
 email, which nobody checks: fine to try it on your machine. Before sharing
 the server, turn on a real sign-in such as Google (see Sign-in below).
+
+A first tour, in five minutes:
+
+1. Open <http://localhost:3000>, sign in with any name and email, and pick
+   **Retrospective** under *Start from a template*.
+2. Add sticky notes (`S`, then click), link two with a connector (`C`,
+   drag from one to the other), comment on one (`M`).
+3. Open a private window, sign in as someone else and open the same board
+   (**Share → Copy link**): each sees the other's cursor and edits live.
+   Start a vote or a timer from the top bar.
 
 | Flag           | Variable     | Default   | Purpose                                                   |
 | -------------- | ------------ | --------- | --------------------------------------------------------- |
