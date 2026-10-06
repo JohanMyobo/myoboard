@@ -8,7 +8,10 @@ Yjs. No database, account, API key or `.env` file: boards are files in
 `data/`.
 
 Status: week-1 MVP, done and tested ("Not built yet" in README.md lists the
-gaps). Don't publish packages or releases unless the user asks.
+gaps). The repository is public: anyone can read everything committed,
+history and commit metadata included. Never commit secrets, credentials,
+internal hostnames or URLs, other people's names, or personal data, and
+don't publish packages or releases unless the user asks.
 
 ## Get it running
 
@@ -148,6 +151,9 @@ replica/             feature matrix, parity score, recon notes
 - Icons come from `lucide-react`; colours and fonts from
   `src/model/palette.ts`.
 - Commit messages: an imperative summary line, then a short why.
+- Commits are public with their author address. Before the first commit on a
+  new machine, check `git config user.email`; if it is not the user's
+  GitHub noreply address, suggest that one, set for this repository only.
 
 ## Done means
 
