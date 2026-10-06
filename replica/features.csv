@@ -2,8 +2,8 @@ feature,area,priority,original,clone,notes
 Infinite canvas with pan and zoom,canvas,must,yes,yes,
 Sticky notes in several colours,sticky notes,must,yes,yes,8 colours; text shrinks to fit; author shown
 Edit text directly on the canvas,editing,must,yes,yes,
-Shapes with a label,shapes,must,yes,partial,rectangle ellipse and diamond only
-Connectors attached to objects,connectors,must,yes,partial,straight with an arrowhead; no elbows curves or labels
+Shapes with a label,shapes,must,yes,yes,10 shapes: rectangle pill ellipse diamond triangle hexagon parallelogram arrow star cylinder
+Connectors attached to objects,connectors,must,yes,yes,straight elbow or curved; labels; arrowheads at none one or both ends; attach to each shape's real outline
 Select move and resize objects,editing,must,yes,yes,
 Multi-select with Shift and a selection box,editing,must,yes,yes,
 Undo and redo,editing,must,yes,yes,only your own edits as in the original
@@ -23,8 +23,8 @@ See who is on the board,collaboration,should,yes,yes,
 See what others have selected,collaboration,should,yes,yes,
 Export the board as an image,export,should,yes,partial,PNG only
 Comments,comments,should,yes,no,
-Images and file uploads,media,should,yes,no,
-Copy and paste,editing,should,yes,partial,duplicate only
+Images and file uploads,media,should,yes,partial,images (PNG JPEG GIF WebP) from a button or by dropping or pasting; no other files
+Copy and paste,editing,should,yes,yes,within and between boards through the system clipboard (images copied over); pasted lines become sticky notes
 Templates,templates,should,yes,no,
 Voting sessions,facilitation,should,yes,no,
 Timer,facilitation,should,yes,no,

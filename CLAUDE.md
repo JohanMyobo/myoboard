@@ -90,7 +90,9 @@ src/
   api.ts             typed client for the JSON API
   BoardScreen.tsx    board page: loads your role, then state, shortcuts, camera, export
   screens/           LoginScreen, HomeScreen (board list), MessageScreen
-  model/             no React: types, Board (Yjs), geometry, palette
+  clipboard.ts       copy and paste payloads: what a copy takes, pasted text to notes
+  model/             no React: types, Board (Yjs), geometry, shapes (outlines,
+                     label boxes), palette
   sync/              session (y-websocket + IndexedDB), identity (your account)
   canvas/            Konva: Canvas (tools, drafts, drag, resize), nodes, camera,
                      TextEditor, PeerCursors, exportPng
@@ -118,9 +120,18 @@ replica/             feature matrix, parity score, recon notes
 - A board is a Yjs doc. `objects` maps each id to a Y.Map of properties, so
   concurrent edits merge property by property (last writer wins); `meta`
   holds the title.
-- Object types (`src/model/types.ts`): sticky, shape (rect, ellipse,
-  diamond), text, pen, connector (each end attached to an object or free),
-  section, stamp.
+- Object types (`src/model/types.ts`): sticky, shape (10 kinds, outlines in
+  `model/shapes.ts`), text, pen, connector (each end attached to an object
+  or free; `style` straight, elbow or curved, `arrows`, `label`), section,
+  stamp, image (`src` is `/media/<board>/<file>`).
+- Optional properties are absent on objects from older boards: read them
+  with a default (`conn.style ?? 'straight'`, `conn.arrows ?? 'end'`).
+- Connectors are drawn from `connectorRoute` (`geometry.ts`), which also
+  gives their bounds and label position; `shapeOutline` drives the canvas,
+  connector attachment and the toolbar icons, so the three agree.
+- Copies go in through `Board.insertCopies` (duplicate, paste, templates):
+  one transaction, so one undo step, with connectors remapped to the
+  copies.
 - Back-to-front order is a fractional `index` string
   (`fractional-indexing`); ties break on id.
 - Change a board only through `Board` methods (`create`, `update`,
@@ -184,6 +195,13 @@ replica/             feature matrix, parity score, recon notes
 - Vite serves the app's own bundles under `/assets/`, so board images live
   under `/media/<board>/<file>` (on disk in `data/media/`). Don't route
   anything else under `/assets/`.
+- Copy, cut and paste listen to the document's clipboard events (not
+  keydown), skip inputs and textareas, and write a private
+  `application/x-myoboard` format next to plain text. An image belongs to
+  its board: pasting it into another board copies the file there through
+  `POST /api/boards/<id>/assets/import`.
+- Images load once per address (`imageEntry` in `nodes.tsx`), whatever the
+  number of objects showing them.
 - End-to-end tests must sign in: `openBoard` in `tests/e2e/helpers.ts` signs
   the page's context in (local mode) and creates the board through the API.
   Server tests use `server/test-helpers.ts` the same way.
@@ -246,6 +264,7 @@ information only. Keep it that way:
 
 v2, in order: (1) access: sign-in, permissions, board list, CI (done);
 (2) content: images, copy and paste, more shapes, elbow connectors with
-labels; (3) workshops: comments, templates, timer, voting, Docker image.
+labels (done); (3) workshops: comments, templates, timer, voting, Docker
+image.
 See `replica/parity.md`. The maintainer sets the scope: check with the user
 before starting a large feature.

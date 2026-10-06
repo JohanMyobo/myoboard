@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   boundaryPoint,
   connectorEnds,
+  connectorRoute,
   contains,
   estimateTextHeight,
   fitFontSize,
@@ -125,5 +126,52 @@ describe('hit testing', () => {
     expect(intersects({ x: 0, y: 0, w: 10, h: 10 }, { x: 5, y: 5, w: 10, h: 10 })).toBe(true)
     expect(intersects({ x: 0, y: 0, w: 10, h: 10 }, { x: 11, y: 0, w: 10, h: 10 })).toBe(false)
     expect(contains({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: 2, w: 5, h: 5 })).toBe(true)
+  })
+})
+
+describe('connector routes', () => {
+  const a = { id: 'a', type: 'sticky', index: 'a0', x: 0, y: 0, w: 100, h: 100, color: '#fff', text: '' } as const
+  const b = { id: 'b', type: 'sticky', index: 'a1', x: 300, y: 200, w: 100, h: 100, color: '#fff', text: '' } as const
+  const lookup = (id: string) => ({ a, b })[id as 'a' | 'b']
+
+  it('runs elbows from the facing sides, bending halfway', () => {
+    const route = connectorRoute({ from: { id: 'a' }, to: { id: 'b' }, style: 'elbow' }, lookup)!
+    expect(route.points).toEqual([100, 50, 200, 50, 200, 250, 300, 250])
+    expect(route.mid).toEqual({ x: 200, y: 150 })
+  })
+
+  it('turns an elbow vertical when the ends are mostly above each other', () => {
+    const below = { ...b, x: 50, y: 400 }
+    const route = connectorRoute({ from: { id: 'a' }, to: { id: 'b' }, style: 'elbow' }, (id) => (id === 'a' ? a : below))!
+    expect(route.points.slice(0, 2)).toEqual([50, 100])
+    expect(route.points.slice(-2)).toEqual([100, 400])
+  })
+
+  it('drops the bends of an elbow between aligned objects', () => {
+    const level = { ...b, y: 0 }
+    const route = connectorRoute({ from: { id: 'a' }, to: { id: 'b' }, style: 'elbow' }, (id) => (id === 'a' ? a : level))!
+    expect(route.points).toEqual([100, 50, 300, 50])
+  })
+
+  it('curves leave and arrive along the facing sides', () => {
+    const route = connectorRoute({ from: { id: 'a' }, to: { id: 'b' }, style: 'curved' }, lookup)!
+    expect(route.bezier).toBe(true)
+    const [sx, sy, c1x, c1y, c2x, c2y, ex, ey] = route.points
+    expect([sx, sy, ex, ey]).toEqual([100, 50, 300, 250])
+    expect(c1y).toBe(sy)
+    expect(c1x).toBeGreaterThan(sx)
+    expect(c2y).toBe(ey)
+    expect(c2x).toBeLessThan(ex)
+  })
+
+  it('keeps old connectors straight', () => {
+    const route = connectorRoute({ from: { id: 'a' }, to: { id: 'b' } }, lookup)!
+    expect(route.points).toHaveLength(4)
+    expect(route.bezier).toBe(false)
+  })
+
+  it('bounds a connector by its whole route', () => {
+    const conn = { id: 'c', type: 'connector', index: 'a2', x: 0, y: 0, from: { id: 'a' }, to: { id: 'b' }, color: '#000', style: 'elbow' } as const
+    expect(objectBounds(conn, lookup)).toEqual({ x: 100, y: 50, w: 200, h: 200 })
   })
 })

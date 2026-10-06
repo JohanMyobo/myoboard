@@ -4,6 +4,11 @@ import { nanoid } from 'nanoid'
 import { isAttached } from './types'
 import type { BoardObject, Endpoint, NewObject, ObjectPatch } from './types'
 
+interface Offset {
+  x: number
+  y: number
+}
+
 /** Transaction origin for edits made in this tab; only these can be undone here. */
 export const LOCAL_ORIGIN = 'myoboard:local'
 
@@ -95,9 +100,9 @@ export class Board {
   }
 
   /** Creates objects on top of everything else, in the given order. */
-  createMany(inputs: readonly NewObject[]): string[] {
+  createMany(inputs: readonly NewObject[], presetIds?: readonly string[]): string[] {
     if (inputs.length === 0) return []
-    const ids = inputs.map(() => nanoid(12))
+    const ids = presetIds ? [...presetIds] : inputs.map(() => nanoid(12))
     const indexes = generateNKeysBetween(this.lastIndex(), null, inputs.length)
     this.transact(() => {
       inputs.forEach((input, i) => {
@@ -143,25 +148,36 @@ export class Board {
   /** Copies objects (keeping their stacking order), offset by `offset`. Returns the new ids. */
   duplicate(ids: Iterable<string>, offset = 24): string[] {
     const wanted = new Set(ids)
-    const originals = this.snapshot.ordered.filter((obj) => wanted.has(obj.id))
-    const copies = originals.map((obj) => {
-      const { id, index, ...rest } = obj
-      void id
-      void index
-      return this.offsetCopy(rest as NewObject, offset)
-    })
-    const created = this.createMany(copies)
-    const newIds = new Map(originals.map((obj, i) => [obj.id, created[i]]))
-    // Copied connectors follow copied objects; ends attached elsewhere stay put.
+    return this.insertCopies(
+      this.snapshot.ordered.filter((obj) => wanted.has(obj.id)),
+      { x: offset, y: offset },
+    )
+  }
+
+  /**
+   * Adds copies of objects (from this board, the clipboard or a template),
+   * moved by `offset`, on top of everything, in one change. Copied
+   * connectors follow copied objects; ends attached elsewhere stay put.
+   */
+  insertCopies(originals: readonly BoardObject[], offset: Offset): string[] {
+    const ids = originals.map(() => nanoid(12))
+    const newIds = new Map(originals.map((obj, i) => [obj.id, ids[i]]))
     const remap = (endpoint: Endpoint): Endpoint => {
       if (!isAttached(endpoint)) return endpoint
       const mapped = newIds.get(endpoint.id)
       return mapped ? { id: mapped } : endpoint
     }
-    const fixes = originals.flatMap((obj, i) =>
-      obj.type === 'connector' ? [{ id: created[i], patch: { from: remap(obj.from), to: remap(obj.to) } }] : [],
-    )
-    if (fixes.length > 0) this.updateMany(fixes)
+    const copies = originals.map((obj) => {
+      const { id, index, ...rest } = obj
+      void id
+      void index
+      const copy = this.offsetCopy(rest as NewObject, offset)
+      return copy.type === 'connector' ? { ...copy, from: remap(copy.from), to: remap(copy.to) } : copy
+    })
+    let created: string[] = []
+    this.transact(() => {
+      created = this.createMany(copies, ids)
+    })
     return created
   }
 
@@ -217,10 +233,10 @@ export class Board {
     return last
   }
 
-  private offsetCopy(obj: NewObject, offset: number): NewObject {
-    if (obj.type !== 'connector') return { ...obj, x: obj.x + offset, y: obj.y + offset }
+  private offsetCopy(obj: NewObject, offset: Offset): NewObject {
+    if (obj.type !== 'connector') return { ...obj, x: obj.x + offset.x, y: obj.y + offset.y }
     const shift = (endpoint: Endpoint): Endpoint =>
-      isAttached(endpoint) ? endpoint : { x: endpoint.x + offset, y: endpoint.y + offset }
+      isAttached(endpoint) ? endpoint : { x: endpoint.x + offset.x, y: endpoint.y + offset.y }
     return { ...obj, from: shift(obj.from), to: shift(obj.to) }
   }
 

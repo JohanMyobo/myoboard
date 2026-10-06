@@ -5,18 +5,17 @@ import { Arrow, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import { ACCENT, FONT_FAMILY, INK, SECTION_COLORS } from '../model/palette'
 import {
-  boundaryPoint,
-  center,
+  boxFromPoints,
   connectorEnds,
+  connectorRoute,
   contains,
   intersects,
   normalizeBox,
   objectBounds,
   objectsInside,
-  outlineKind,
   topmostAt,
 } from '../model/geometry'
-import type { Box, Point } from '../model/geometry'
+import type { Box, ConnectorRoute, Point } from '../model/geometry'
 import { isAttached } from '../model/types'
 import type { BoardObject, ConnectorObject, Endpoint, SectionObject, StampObject } from '../model/types'
 import type { BoardSnapshot } from '../model/board'
@@ -27,7 +26,7 @@ import { DEFAULT_SIZES } from '../tools'
 import type { Tool, ToolOptions } from '../tools'
 import { drawRegion, toWorld } from './camera'
 import type { Camera } from './camera'
-import { ConnectorNode, PenNode, SectionNode, ShapeNode, StampNode, StickyNode, TextNode } from './nodes'
+import { ConnectorNode, ImageNode, PenNode, SectionNode, ShapeNode, StampNode, StickyNode, TextNode } from './nodes'
 import type { NodeHandlers } from './nodes'
 
 /** An interaction in progress, drawn in the overlay layer until it is committed. */
@@ -77,8 +76,11 @@ export interface CanvasProps {
   readOnly: boolean
 }
 
-const RESIZABLE: ReadonlySet<BoardObject['type']> = new Set(['sticky', 'shape', 'section', 'text'])
-export const EDITABLE: ReadonlySet<BoardObject['type']> = new Set(['sticky', 'shape', 'section', 'text'])
+const RESIZABLE: ReadonlySet<BoardObject['type']> = new Set(['sticky', 'shape', 'section', 'text', 'image'])
+/** Resized from the corners, keeping their proportions. */
+const KEEP_RATIO: ReadonlySet<BoardObject['type']> = new Set(['sticky', 'image'])
+/** What Enter or a double-click edits: text, a section's title, a connector's label. */
+export const EDITABLE: ReadonlySet<BoardObject['type']> = new Set(['sticky', 'shape', 'section', 'text', 'connector'])
 const CURSOR_THROTTLE_MS = 40
 const MIN_SIZE = 24
 /** Below this zoom, text is too small to read and is not drawn. */
@@ -90,7 +92,7 @@ const round1 = (n: number) => Math.round(n * 10) / 10
 function anchorsFor(obj: BoardObject | null): string[] {
   if (!obj) return []
   if (obj.type === 'text') return ['middle-left', 'middle-right']
-  if (obj.type === 'sticky') return ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+  if (KEEP_RATIO.has(obj.type)) return ['top-left', 'top-right', 'bottom-left', 'bottom-right']
   return ['top-left', 'top-center', 'top-right', 'middle-right', 'middle-left', 'bottom-left', 'bottom-center', 'bottom-right']
 }
 
@@ -284,7 +286,7 @@ export function Canvas(props: CanvasProps) {
         if (isAttached(d.from) && isAttached(to) && d.from.id === to.id) return
         const ends = connectorEnds({ from: d.from, to }, lookup)
         if (!ends || Math.hypot(ends.end.x - ends.start.x, ends.end.y - ends.start.y) < 12 / cam.scale) return
-        const id = board.create({ type: 'connector', x: 0, y: 0, from: d.from, to, color: INK, author })
+        const id = board.create({ type: 'connector', x: 0, y: 0, from: d.from, to, color: INK, style: options.connectorStyle, author })
         board.checkpoint()
         selectNow([id])
         setTool('select')
@@ -501,12 +503,15 @@ export function Canvas(props: CanvasProps) {
     const near = (box: Box | null) => fullRender || (box !== null && intersects(region, box))
     const sections: SectionObject[] = []
     const items: BoardObject[] = []
-    const connectors: { conn: ConnectorObject; start: Point; end: Point }[] = []
+    const connectors: { conn: ConnectorObject; route: ConnectorRoute }[] = []
     const stamps: StampObject[] = []
     for (const obj of snapshot.ordered) {
       if (obj.type === 'connector') {
-        const ends = connectorEnds(obj, lookup)
-        if (ends && (keep.has(obj.id) || near({ ...normalizeBox(ends.start, ends.end) }))) connectors.push({ conn: obj, ...ends })
+        const route = connectorRoute(obj, lookup)
+        if (!route) continue
+        const points = []
+        for (let i = 0; i + 1 < route.points.length; i += 2) points.push({ x: route.points[i], y: route.points[i + 1] })
+        if (keep.has(obj.id) || near(boxFromPoints(points))) connectors.push({ conn: obj, route })
         continue
       }
       if (!keep.has(obj.id) && !near(objectBounds(obj))) continue
@@ -538,6 +543,8 @@ export function Canvas(props: CanvasProps) {
         return <SectionNode key={obj.id} obj={obj} {...common} />
       case 'stamp':
         return <StampNode key={obj.id} obj={obj} {...common} />
+      case 'image':
+        return <ImageNode key={obj.id} obj={obj} {...common} />
       case 'connector':
         return null
     }
@@ -586,16 +593,15 @@ export function Canvas(props: CanvasProps) {
           />
         )
       case 'connector': {
-        const fromObj = isAttached(draft.from) ? snapshot.byId.get(draft.from.id) : undefined
-        const fromBox = fromObj ? objectBounds(fromObj, lookup) : null
-        const start = fromObj && fromBox ? boundaryPoint(fromBox, outlineKind(fromObj), draft.end) : isAttached(draft.from) ? draft.end : draft.from
         const hover = draft.hoverId ? snapshot.byId.get(draft.hoverId) : undefined
         const hoverBox = hover ? objectBounds(hover, lookup) : null
-        const end = hover && hoverBox ? boundaryPoint(hoverBox, outlineKind(hover), fromBox ? center(fromBox) : start) : draft.end
+        const to: Endpoint = hover ? { id: hover.id } : draft.end
+        const route = connectorRoute({ from: draft.from, to, style: props.options.connectorStyle }, lookup)
+        if (!route) return null
         return (
           <>
             {hoverBox && outline(hoverBox, 'hover', ACCENT)}
-            <Arrow points={[start.x, start.y, end.x, end.y]} stroke={ACCENT} fill={ACCENT} strokeWidth={2} pointerLength={11} pointerWidth={11} dash={[8, 6]} />
+            <Arrow points={route.points} bezier={route.bezier} stroke={ACCENT} fill={ACCENT} strokeWidth={2} pointerLength={11} pointerWidth={11} dash={[8, 6]} lineJoin="round" />
           </>
         )
       }
@@ -617,16 +623,16 @@ export function Canvas(props: CanvasProps) {
       <Layer>
         {groups.sections.map(renderObject)}
         {groups.items.map(renderObject)}
-        {groups.connectors.map(({ conn, start, end }) => (
+        {groups.connectors.map(({ conn, route }) => (
           <ConnectorNode
             key={conn.id}
             id={conn.id}
-            x1={start.x}
-            y1={start.y}
-            x2={end.x}
-            y2={end.y}
+            route={route}
             color={conn.color}
+            arrows={conn.arrows ?? 'end'}
+            label={conn.label ?? ''}
             selected={selected.has(conn.id)}
+            editing={conn.id === editingId}
             handlers={handlers}
           />
         ))}
@@ -636,7 +642,7 @@ export function Canvas(props: CanvasProps) {
           rotateEnabled={false}
           flipEnabled={false}
           ignoreStroke
-          keepRatio={resizable?.type === 'sticky'}
+          keepRatio={resizable ? KEEP_RATIO.has(resizable.type) : false}
           enabledAnchors={anchorsFor(resizable)}
           anchorSize={9}
           anchorCornerRadius={3}

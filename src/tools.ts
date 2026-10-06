@@ -1,5 +1,5 @@
 import { PEN_COLORS, SHAPE_COLORS, STAMPS, STICKY_COLORS } from './model/palette'
-import type { ShapeKind } from './model/types'
+import type { ConnectorStyle, ShapeKind } from './model/types'
 
 export type Tool = 'select' | 'hand' | 'sticky' | 'shape' | 'text' | 'pen' | 'connector' | 'section' | 'stamp'
 
@@ -11,6 +11,7 @@ export interface ToolOptions {
   penColor: string
   penWidth: number
   stamp: string
+  connectorStyle: ConnectorStyle
 }
 
 export const DEFAULT_TOOL_OPTIONS: ToolOptions = {
@@ -20,6 +21,7 @@ export const DEFAULT_TOOL_OPTIONS: ToolOptions = {
   penColor: PEN_COLORS[0].value,
   penWidth: 4,
   stamp: STAMPS[0],
+  connectorStyle: 'elbow',
 }
 
 /** What a viewer can still use. */

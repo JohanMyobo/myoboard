@@ -10,11 +10,17 @@ time between everyone on the same board.
 
 - **Infinite canvas**: scroll or Space-drag to pan, Ctrl/⌘ + scroll (or pinch) to zoom, zoom to fit.
 - **Objects**: sticky notes (8 colours, text that shrinks to fit, author name),
-  shapes (rectangle, ellipse, diamond) with labels, free text, pen strokes,
-  connectors attached to objects, sections that carry their content when
-  moved, reaction stamps.
+  10 shapes with labels (rectangle, pill, ellipse, diamond, triangle,
+  hexagon, parallelogram, arrow, star, cylinder), free text, pen strokes,
+  images, sections that carry their content when moved, reaction stamps.
+- **Connectors**: attached to objects (they meet each shape's real outline),
+  straight, elbow or curved, with a label and arrowheads at either end.
+- **Images**: add PNG, JPEG, GIF or WebP pictures from the toolbar, by
+  dropping files on the board or by pasting a screenshot.
 - **Editing**: click, Shift-click or drag a box to select; move, resize,
-  recolour, duplicate, bring to front, delete; undo and redo (your own edits only).
+  recolour, duplicate, bring to front, delete; undo and redo (your own edits
+  only); copy, cut and paste within a board, between boards and from other
+  apps (a pasted list becomes one sticky note per line).
 - **Real time**: everyone on the board sees edits as they happen (text
   included), named cursors, who is here, and what others have selected.
 - **Resilient**: every board is saved on the server and kept in the browser
@@ -92,10 +98,12 @@ company's accounts can sign in; `OIDC_ALLOWED_DOMAINS` adds a second check.
 | `S` / `R` / `T`            | Sticky note / shape / text        |
 | `P` / `C` / `F` / `E`      | Pen / connector / section / stamp |
 | Space + drag               | Pan with any tool                 |
-| Enter or double-click      | Edit the selected object's text   |
+| Enter or double-click      | Edit the selected object's text (a connector's label) |
 | Esc                        | Finish editing, clear selection   |
 | Delete / Backspace         | Delete the selection              |
 | Ctrl/⌘ Z, Ctrl/⌘ Shift Z   | Undo, redo                        |
+| `I`                        | Add an image                      |
+| Ctrl/⌘ C / X / V           | Copy / cut / paste                |
 | Ctrl/⌘ D                   | Duplicate                         |
 | Ctrl/⌘ A                   | Select all                        |
 | Ctrl/⌘ + / − / 0, Shift 1  | Zoom in / out / 100% / fit        |
@@ -144,8 +152,10 @@ npm run test:e2e    # Playwright: builds the app and drives real browsers
 The server tests cover accounts, permissions (including a viewer trying
 to edit through the sync protocol), images and a complete OpenID Connect
 sign-in against a local test provider. The end-to-end suite checks
-signing in and the board list, sharing with viewers and editors live, two
-people editing the same board (edits, drags, cursors, presence),
+signing in and the board list, sharing with viewers and editors live,
+images (toolbar, drop, paste), copy and paste within and between boards,
+shapes and labelled connectors, two people editing the same board (edits,
+drags, cursors, presence),
 persistence across reloads and devices, connectors, sections and undo, pen
 strokes, shapes, stamps and PNG export, and frame times with 500 sticky
 notes. GitHub Actions runs everything on Node 22 and 24 for every push. It needs a Chromium: run
@@ -181,9 +191,9 @@ feature matrix and parity score are in [`replica/`](replica).
 
 ## Not built yet
 
-Comments, images, templates, voting, timer, rich text, copy and paste,
-elbow connectors with labels. See [`replica/parity.md`](replica/parity.md)
-for the full list, in build order.
+Comments, templates, voting, timer, rich text, files other than images.
+See [`replica/parity.md`](replica/parity.md) for the full list, in build
+order.
 
 ## License
 

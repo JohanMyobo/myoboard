@@ -7,9 +7,19 @@
  * `index` is a fractional index that orders objects from back to front.
  */
 
-export type ObjectType = 'sticky' | 'shape' | 'text' | 'pen' | 'connector' | 'section' | 'stamp'
+export type ObjectType = 'sticky' | 'shape' | 'text' | 'pen' | 'connector' | 'section' | 'stamp' | 'image'
 
-export type ShapeKind = 'rect' | 'ellipse' | 'diamond'
+export type ShapeKind =
+  | 'rect'
+  | 'pill'
+  | 'ellipse'
+  | 'diamond'
+  | 'triangle'
+  | 'hexagon'
+  | 'parallelogram'
+  | 'arrow'
+  | 'star'
+  | 'cylinder'
 
 interface BaseObject {
   id: string
@@ -59,11 +69,19 @@ export interface PenObject extends BaseObject {
 /** A connector end is either attached to an object or left at a free point. */
 export type Endpoint = { id: string } | { x: number; y: number }
 
+export type ConnectorStyle = 'straight' | 'elbow' | 'curved'
+export type ArrowHeads = 'end' | 'both' | 'none'
+
 export interface ConnectorObject extends BaseObject {
   type: 'connector'
   from: Endpoint
   to: Endpoint
   color: string
+  /** Absent on connectors drawn before there was a choice: straight. */
+  style?: ConnectorStyle
+  /** Absent: an arrowhead at the end. */
+  arrows?: ArrowHeads
+  label?: string
 }
 
 export interface SectionObject extends BaseObject {
@@ -81,6 +99,16 @@ export interface StampObject extends BaseObject {
   color: string
 }
 
+/** A picture uploaded to the board; `src` is its address on the server (/media/<board>/<file>). */
+export interface ImageObject extends BaseObject {
+  type: 'image'
+  w: number
+  h: number
+  src: string
+  /** The file's name, as alternative text. */
+  name?: string
+}
+
 export type BoardObject =
   | StickyObject
   | ShapeObject
@@ -89,6 +117,7 @@ export type BoardObject =
   | ConnectorObject
   | SectionObject
   | StampObject
+  | ImageObject
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 type DistributivePatch<T> = T extends unknown ? Partial<Omit<T, 'id' | 'type'>> : never

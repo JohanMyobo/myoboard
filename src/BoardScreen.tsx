@@ -5,14 +5,18 @@ import { flushSync } from 'react-dom'
 import { ApiError, api } from './api'
 import type { BoardAccess, User } from './api'
 import { Canvas, EDITABLE } from './canvas/Canvas'
+import { CLIPBOARD_TYPE, boundsOf, copySelection, parsePayload, pasteable, plainText, textToObjects } from './clipboard'
+import type { ClipboardPayload } from './clipboard'
 import { PeerCursors } from './canvas/PeerCursors'
 import { TextEditor } from './canvas/TextEditor'
 import type { EditableObject } from './canvas/TextEditor'
-import { fitBox, toScreen, zoomAt } from './canvas/camera'
+import { fitBox, toScreen, toWorld, zoomAt } from './canvas/camera'
 import type { Camera } from './canvas/camera'
 import { contentBounds, downloadDataUrl, fileNameFor, renderBoardPng } from './canvas/exportPng'
 import { useBoardSnapshot, useConnectionStatus, useElementSize, usePeers } from './hooks'
-import { objectBounds, unionBoxes } from './model/geometry'
+import { connectorRoute, objectBounds, unionBoxes } from './model/geometry'
+import type { Point } from './model/geometry'
+import type { BoardObject, NewObject } from './model/types'
 import { navigate } from './router'
 import { MessageScreen } from './screens/MessageScreen'
 import type { Identity } from './sync/identity'
@@ -112,6 +116,27 @@ export function BoardScreen({ boardId, user, onSignOut }: BoardScreenProps) {
   if (!session || !access) return <div className="loading">Opening board…</div>
   return <BoardView session={session} identity={identity} user={user} access={access} onAccessChange={setAccess} onSignOut={onSignOut} />
 }
+
+const IMAGE_TYPES = /^image\/(png|jpeg|gif|webp)$/
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+/** Longest side of a newly added image, in board units. */
+const MAX_IMAGE_SIDE = 480
+
+async function naturalSize(file: Blob): Promise<{ width: number; height: number }> {
+  try {
+    const bitmap = await createImageBitmap(file)
+    const size = { width: bitmap.width, height: bitmap.height }
+    bitmap.close()
+    return size
+  } catch {
+    return { width: 320, height: 240 }
+  }
+}
+
+const typingIn = (target: EventTarget | null) =>
+  target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+
+const round1 = (n: number) => Math.round(n * 10) / 10
 
 function gridStyle(camera: Camera): CSSProperties {
   let step = 24 * camera.scale
@@ -254,6 +279,156 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
     setSelection([])
   }, [board, selection])
 
+  // Pasted and dropped things land under the pointer when it is over the
+  // board, otherwise in the middle of the view.
+  const pointerRef = useRef<Point | null>(null)
+  useEffect(() => {
+    const onMove = (evt: PointerEvent) => {
+      const rect = wrapRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const inside = evt.clientX >= rect.left && evt.clientX <= rect.right && evt.clientY >= rect.top && evt.clientY <= rect.bottom
+      pointerRef.current = inside ? { x: evt.clientX - rect.left, y: evt.clientY - rect.top } : null
+    }
+    window.addEventListener('pointermove', onMove)
+    return () => window.removeEventListener('pointermove', onMove)
+  }, [])
+  const pointerWorld = useCallback((): Point | null => (pointerRef.current ? toWorld(cameraRef.current, pointerRef.current) : null), [])
+  const viewCenter = useCallback((): Point => toWorld(cameraRef.current, { x: sizeRef.current.width / 2, y: sizeRef.current.height / 2 }), [])
+
+  const place = useCallback(
+    (objects: NewObject[]) => {
+      if (objects.length === 0) return
+      board.checkpoint()
+      const ids = board.createMany(objects)
+      board.checkpoint()
+      setTool('select')
+      setSelection(ids)
+    },
+    [board, setTool],
+  )
+
+  const addImages = useCallback(
+    async (files: File[], at: Point) => {
+      const pictures = files.filter((file) => IMAGE_TYPES.test(file.type))
+      if (pictures.length < files.length) flash('Only PNG, JPEG, GIF and WebP images can be added')
+      const fitting = pictures.filter((file) => file.size <= MAX_IMAGE_BYTES)
+      if (fitting.length < pictures.length) flash('Images must be under 10 MB')
+      if (fitting.length === 0) return
+      flash(fitting.length > 1 ? `Adding ${fitting.length} images…` : 'Adding the image…')
+      const added = await Promise.all(
+        fitting.map(async (file, i): Promise<NewObject | null> => {
+          try {
+            const [{ url }, natural] = await Promise.all([api.uploadImage(session.boardId, file), naturalSize(file)])
+            const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(natural.width, natural.height, 1))
+            const w = Math.max(24, Math.round(natural.width * scale))
+            const h = Math.max(24, Math.round(natural.height * scale))
+            const nudge = i * 24
+            return { type: 'image', x: round1(at.x - w / 2 + nudge), y: round1(at.y - h / 2 + nudge), w, h, src: url, name: file.name.slice(0, 120), author: identity.name }
+          } catch (err) {
+            flash((err as Error).message)
+            return null
+          }
+        }),
+      )
+      place(added.filter((obj): obj is NewObject => obj !== null))
+    },
+    [session.boardId, identity.name, flash, place],
+  )
+
+  const pastePayload = useCallback(
+    async (payload: ClipboardPayload, at: Point | null) => {
+      const fromHere = payload.board === session.boardId
+      let objects: BoardObject[] = payload.objects
+      if (!fromHere) {
+        // Images belong to the board they were added to: copy them over.
+        const imported = await Promise.all(
+          objects.map(async (obj) => {
+            if (obj.type !== 'image') return obj
+            try {
+              return { ...obj, src: (await api.importImage(session.boardId, obj.src)).url }
+            } catch {
+              return null
+            }
+          }),
+        )
+        objects = imported.filter((obj): obj is BoardObject => obj !== null)
+        if (objects.length < payload.objects.length) flash('Some images could not be copied')
+      }
+      objects = pasteable(objects, (id) => board.get(id) !== undefined)
+      const bounds = boundsOf(objects)
+      if (!bounds) return
+      const target = at ?? (fromHere ? null : viewCenter())
+      const offset = target ? { x: round1(target.x - (bounds.x + bounds.w / 2)), y: round1(target.y - (bounds.y + bounds.h / 2)) } : { x: 24, y: 24 }
+      board.checkpoint()
+      const ids = board.insertCopies(objects, offset)
+      board.checkpoint()
+      setTool('select')
+      setSelection(ids)
+    },
+    [board, session.boardId, flash, viewCenter, setTool],
+  )
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const pickImage = useCallback(() => fileInputRef.current?.click(), [])
+
+  // Copy, cut and paste through the system clipboard: within a board,
+  // between boards and tabs, and from other apps (images, text).
+  const clip = useRef({ selection, snapshot, readOnly, remove, pastePayload, addImages, place, options })
+  clip.current = { selection, snapshot, readOnly, remove, pastePayload, addImages, place, options }
+  const lastCopied = useRef<ClipboardPayload | null>(null)
+  useEffect(() => {
+    const copy = (e: ClipboardEvent, cut: boolean) => {
+      if (typingIn(e.target) || !e.clipboardData) return
+      const state = clip.current
+      const payload = copySelection(state.snapshot, state.selection, session.boardId)
+      if (!payload) return
+      e.preventDefault()
+      e.clipboardData.setData(CLIPBOARD_TYPE, JSON.stringify(payload))
+      e.clipboardData.setData('text/plain', plainText(payload))
+      lastCopied.current = payload
+      if (cut && !state.readOnly) state.remove()
+    }
+    const onCopy = (e: ClipboardEvent) => copy(e, false)
+    const onCut = (e: ClipboardEvent) => copy(e, true)
+    const onPaste = (e: ClipboardEvent) => {
+      const state = clip.current
+      if (typingIn(e.target) || !e.clipboardData || state.readOnly) return
+      const data = e.clipboardData
+      const at = pointerWorld()
+      const payload = parsePayload(data.getData(CLIPBOARD_TYPE))
+      if (payload) {
+        e.preventDefault()
+        void state.pastePayload(payload, at)
+        return
+      }
+      const files = [...data.files]
+      if (files.some((file) => file.type.startsWith('image/'))) {
+        e.preventDefault()
+        void state.addImages(files, at ?? viewCenter())
+        return
+      }
+      const text = data.getData('text/plain')
+      // Browsers that drop the private format still paste what this tab copied.
+      if (lastCopied.current && text === plainText(lastCopied.current)) {
+        e.preventDefault()
+        void state.pastePayload(lastCopied.current, at)
+        return
+      }
+      if (text.trim()) {
+        e.preventDefault()
+        state.place(textToObjects(text, at ?? viewCenter(), identity.name, state.options.stickyColor))
+      }
+    }
+    document.addEventListener('copy', onCopy)
+    document.addEventListener('cut', onCut)
+    document.addEventListener('paste', onPaste)
+    return () => {
+      document.removeEventListener('copy', onCopy)
+      document.removeEventListener('cut', onCut)
+      document.removeEventListener('paste', onPaste)
+    }
+  }, [session.boardId, identity.name, pointerWorld, viewCenter])
+
   const newBoard = async () => {
     try {
       const created = await api.createBoard()
@@ -314,8 +489,8 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
   }, [setCamera])
 
   // Keyboard shortcuts. Handlers read the latest state through a ref.
-  const keyState = useRef({ selection, snapshot, duplicate, remove, fit, zoomAround, readOnly })
-  keyState.current = { selection, snapshot, duplicate, remove, fit, zoomAround, readOnly }
+  const keyState = useRef({ selection, snapshot, duplicate, remove, fit, zoomAround, readOnly, pickImage })
+  keyState.current = { selection, snapshot, duplicate, remove, fit, zoomAround, readOnly, pickImage }
   useEffect(() => {
     const typing = (target: EventTarget | null) =>
       target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
@@ -369,6 +544,10 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
         return
       }
       if (e.shiftKey) return
+      if (key === 'i') {
+        if (!state.readOnly) state.pickImage()
+        return
+      }
       const next = TOOL_KEYS[key]
       if (next) setTool(next)
     }
@@ -423,6 +602,8 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
   })()
   const editing = editingId ? snapshot.byId.get(editingId) : undefined
   const editingObj = editing && EDITABLE.has(editing.type) ? (editing as EditableObject) : null
+  const labelAnchor =
+    editingObj?.type === 'connector' ? (connectorRoute(editingObj, (id) => snapshot.byId.get(id))?.mid ?? null) : null
 
   return (
     <div
@@ -431,7 +612,24 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
       data-pan-ready={panKey || tool === 'hand' ? 'true' : undefined}
       data-panning={panning ? 'true' : undefined}
     >
-      <div className="canvas-wrap" ref={wrapRef} style={gridStyle(camera)} onPointerDownCapture={() => (autoFitRef.current = false)}>
+      <div
+        className="canvas-wrap"
+        ref={wrapRef}
+        style={gridStyle(camera)}
+        onPointerDownCapture={() => (autoFitRef.current = false)}
+        onDragOver={(e) => {
+          if (readOnly || ![...e.dataTransfer.types].includes('Files')) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'copy'
+        }}
+        onDrop={(e) => {
+          const files = [...e.dataTransfer.files]
+          if (readOnly || files.length === 0) return
+          e.preventDefault()
+          const rect = e.currentTarget.getBoundingClientRect()
+          void addImages(files, toWorld(cameraRef.current, { x: e.clientX - rect.left, y: e.clientY - rect.top }))
+        }}
+      >
         {size.width > 0 && (
           <Canvas
             session={session}
@@ -461,9 +659,13 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
           <TextEditor
             key={editingObj.id}
             obj={editingObj}
+            anchor={labelAnchor}
             camera={camera}
             onChange={(value) =>
-              board.update(editingObj.id, editingObj.type === 'section' ? { title: value } : { text: value })
+              board.update(
+                editingObj.id,
+                editingObj.type === 'section' ? { title: value } : editingObj.type === 'connector' ? { label: value } : { text: value },
+              )
             }
             onClose={closeEditor}
           />
@@ -498,16 +700,37 @@ function BoardView({ session, identity, user, access, onAccessChange, onSignOut 
         onShare={() => setSharing(true)}
         onHome={() => navigate('/')}
       />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        multiple
+        hidden
+        aria-label="Add images"
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])]
+          e.target.value = ''
+          if (files.length > 0) void addImages(files, viewCenter())
+        }}
+      />
       <Toolbar
         tool={tool}
         options={options}
         readOnly={readOnly}
+        onAddImage={pickImage}
         onToolChange={setTool}
         onOptionsChange={(patch) => setOptions((o) => ({ ...o, ...patch }))}
       />
       {sharing && <ShareDialog access={access} title={snapshot.title} onChange={onAccessChange} onClose={() => setSharing(false)} />}
       {!editingId && !panning && contextBarAt && !readOnly && (
-        <ContextBar board={board} selected={selectedObjects} position={contextBarAt} onDuplicate={duplicate} onDelete={remove} />
+        <ContextBar
+          board={board}
+          selected={selectedObjects}
+          position={contextBarAt}
+          onDuplicate={duplicate}
+          onDelete={remove}
+          onEditText={(id) => setEditingId(id)}
+        />
       )}
       <ZoomControls
         scale={camera.scale}

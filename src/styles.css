@@ -1123,3 +1123,62 @@ a.brand:hover {
     width: 140px;
   }
 }
+
+/* --- Shapes picker ------------------------------------------------------- */
+
+.shape-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 28px);
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--hover);
+}
+
+.shape-grid button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.shape-grid button:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.shape-grid button[aria-pressed='true'] {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(29, 29, 27, 0.15);
+}
+
+.shape-menu {
+  position: relative;
+}
+
+.shape-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 6px 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--hover);
+  cursor: pointer;
+}
+
+.shape-popover {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 0;
+}
+
+.text-editor-label {
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
