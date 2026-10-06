@@ -1,0 +1,50 @@
+{
+  "name": "myoboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source collaborative whiteboard: sticky notes, shapes, connectors, sections and live cursors.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n web,sync -c blue,magenta \"vite\" \"tsx watch server/index.ts --port 1234 --no-static\"",
+    "build": "vite build",
+    "start": "npm run build && npm run serve",
+    "serve": "tsx server/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm run test"
+  },
+  "dependencies": {
+    "fractional-indexing": "^4.0.0",
+    "konva": "^10.7.1",
+    "lib0": "^0.2.117",
+    "lucide-react": "^1.52.0",
+    "nanoid": "^6.0.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-konva": "^19.3.0",
+    "sirv": "^3.0.2",
+    "tsx": "^4.23.15",
+    "ws": "^8.22.0",
+    "y-indexeddb": "^9.0.12",
+    "y-protocols": "^1.0.7",
+    "y-websocket": "^3.1.0",
+    "yjs": "^13.6.33"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
+  }
+}

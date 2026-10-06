@@ -1,0 +1,129 @@
+import { describe, expect, it } from 'vitest'
+import {
+  boundaryPoint,
+  connectorEnds,
+  contains,
+  estimateTextHeight,
+  fitFontSize,
+  intersects,
+  objectBounds,
+  objectsInside,
+  topmostAt,
+} from './geometry'
+import type { BoardObject } from './types'
+
+const sticky = (id: string, x: number, y: number, index = 'a0'): BoardObject => ({
+  id,
+  type: 'sticky',
+  index,
+  x,
+  y,
+  w: 200,
+  h: 200,
+  color: '#ffe58f',
+  text: '',
+})
+
+describe('boundaryPoint', () => {
+  const box = { x: 0, y: 0, w: 200, h: 100 }
+
+  it('leaves a rectangle through the nearest side', () => {
+    expect(boundaryPoint(box, 'rect', { x: 500, y: 50 })).toEqual({ x: 200, y: 50 })
+    expect(boundaryPoint(box, 'rect', { x: 100, y: -300 })).toEqual({ x: 100, y: 0 })
+  })
+
+  it('lands on an ellipse', () => {
+    const p = boundaryPoint(box, 'ellipse', { x: 300, y: 150 })
+    const value = ((p.x - 100) / 100) ** 2 + ((p.y - 50) / 50) ** 2
+    expect(value).toBeCloseTo(1, 6)
+  })
+
+  it('lands on a diamond', () => {
+    const p = boundaryPoint(box, 'diamond', { x: 300, y: 150 })
+    expect(Math.abs(p.x - 100) / 100 + Math.abs(p.y - 50) / 50).toBeCloseTo(1, 6)
+  })
+
+  it('returns the centre when pointing at the centre', () => {
+    expect(boundaryPoint(box, 'rect', { x: 100, y: 50 })).toEqual({ x: 100, y: 50 })
+  })
+})
+
+describe('connectorEnds', () => {
+  const a = sticky('a', 0, 0)
+  const b = sticky('b', 400, 0)
+  const lookup = (id: string) => ({ a, b })[id as 'a' | 'b']
+
+  it('attaches both ends to facing sides', () => {
+    expect(connectorEnds({ from: { id: 'a' }, to: { id: 'b' } }, lookup)).toEqual({
+      start: { x: 200, y: 100 },
+      end: { x: 400, y: 100 },
+    })
+  })
+
+  it('supports a free end', () => {
+    expect(connectorEnds({ from: { id: 'a' }, to: { x: 100, y: 600 } }, lookup)).toEqual({
+      start: { x: 100, y: 200 },
+      end: { x: 100, y: 600 },
+    })
+  })
+
+  it('returns null when an attached object is gone', () => {
+    expect(connectorEnds({ from: { id: 'a' }, to: { id: 'missing' } }, lookup)).toBeNull()
+  })
+})
+
+describe('objectBounds', () => {
+  it('measures pen strokes from their points and width', () => {
+    const pen: BoardObject = { id: 'p', type: 'pen', index: 'a0', x: 10, y: 20, points: [0, 0, 100, 50], color: '#000', width: 4 }
+    expect(objectBounds(pen)).toEqual({ x: 8, y: 18, w: 104, h: 54 })
+  })
+
+  it('centres stamps on their position', () => {
+    const stamp: BoardObject = { id: 's', type: 'stamp', index: 'a0', x: 100, y: 100, emoji: '👍', color: '#000' }
+    expect(objectBounds(stamp)).toEqual({ x: 80, y: 80, w: 40, h: 40 })
+  })
+
+  it('grows text boxes with their content', () => {
+    const short: BoardObject = { id: 't', type: 'text', index: 'a0', x: 0, y: 0, w: 200, text: 'hi', fontSize: 20, color: '#000' }
+    const long = { ...short, text: 'a much longer piece of text that has to wrap over several lines' }
+    expect(objectBounds(long)!.h).toBeGreaterThan(objectBounds(short)!.h)
+  })
+})
+
+describe('text layout', () => {
+  it('wraps long paragraphs and counts explicit lines', () => {
+    expect(estimateTextHeight('one\ntwo\nthree', 400, 10)).toBeCloseTo(3 * 13)
+    expect(estimateTextHeight('x'.repeat(100), 56, 10)).toBeGreaterThan(estimateTextHeight('x'.repeat(10), 56, 10))
+  })
+
+  it('shrinks the font until the text fits', () => {
+    expect(fitFontSize('short', 168, 148)).toBe(24)
+    expect(fitFontSize('word '.repeat(80), 168, 148)).toBeLessThan(24)
+  })
+})
+
+describe('hit testing', () => {
+  const section: BoardObject = { id: 's', type: 'section', index: 'a0', x: -50, y: -50, w: 800, h: 600, title: 'S', color: '#fff' }
+  const a = sticky('a', 0, 0, 'a1')
+  const b = sticky('b', 100, 100, 'a2')
+  const outside = sticky('c', 900, 900, 'a3')
+  const ordered = [section, a, b, outside]
+
+  it('picks the topmost object, then the section', () => {
+    expect(topmostAt({ x: 150, y: 150 }, ordered)?.id).toBe('b')
+    expect(topmostAt({ x: 10, y: 10 }, ordered)?.id).toBe('a')
+    expect(topmostAt({ x: 700, y: 500 }, ordered)?.id).toBe('s')
+    expect(topmostAt({ x: 700, y: 500 }, ordered, { includeSections: false })).toBeNull()
+  })
+
+  it('finds what a section holds', () => {
+    const lookup = (id: string) => ordered.find((o) => o.id === id)
+    expect(objectsInside(objectBounds(section)!, ordered, lookup).map((o) => o.id)).toEqual(['a', 'b'])
+  })
+
+  it('compares boxes', () => {
+    expect(intersects({ x: 0, y: 0, w: 10, h: 10 }, { x: 5, y: 5, w: 10, h: 10 })).toBe(true)
+    expect(intersects({ x: 0, y: 0, w: 10, h: 10 }, { x: 11, y: 0, w: 10, h: 10 })).toBe(false)
+    expect(contains({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: 2, w: 5, h: 5 })).toBe(true)
+  })
+})
