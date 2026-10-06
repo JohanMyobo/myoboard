@@ -37,6 +37,14 @@ export async function scale(page: Page): Promise<number> {
   return page.evaluate(() => window.__myoboard!.getCamera().scale)
 }
 
+/**
+ * Waits until the canvas has redrawn. Konva updates what a click hits on the
+ * next frame, so a click right after a change can land where things were.
+ */
+export async function nextFrames(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+}
+
 export async function drag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
   await page.mouse.move(from.x, from.y)
   await page.mouse.down()
