@@ -73,6 +73,8 @@ export interface CanvasProps {
   overlayRef: RefObject<Konva.Layer | null>
   /** Draw every object in full detail (for exports), not just what is near the screen. */
   fullRender: boolean
+  /** A viewer: select and look around, but change nothing. */
+  readOnly: boolean
 }
 
 const RESIZABLE: ReadonlySet<BoardObject['type']> = new Set(['sticky', 'shape', 'section', 'text'])
@@ -93,7 +95,7 @@ function anchorsFor(obj: BoardObject | null): string[] {
 }
 
 export function Canvas(props: CanvasProps) {
-  const { session, snapshot, size, camera, setCamera, tool, selection, editingId, panKey, peers, stageRef, overlayRef, fullRender } = props
+  const { session, snapshot, size, camera, setCamera, tool, selection, editingId, panKey, peers, stageRef, overlayRef, fullRender, readOnly } = props
   const { board, awareness } = session
 
   const [draft, setDraftState] = useState<Draft | null>(null)
@@ -412,7 +414,7 @@ export function Canvas(props: CanvasProps) {
       },
       dblClick(id) {
         const obj = latest.current.snapshot.byId.get(id)
-        if (!obj || latest.current.tool !== 'select' || !EDITABLE.has(obj.type)) return
+        if (!obj || latest.current.tool !== 'select' || latest.current.readOnly || !EDITABLE.has(obj.type)) return
         selectNow([id])
         latest.current.setEditingId(id)
       },
@@ -462,7 +464,7 @@ export function Canvas(props: CanvasProps) {
 
   // The transformer (resize handles) shows for one resizable object at a time.
   const single = selection.length === 1 ? (snapshot.byId.get(selection[0]) ?? null) : null
-  const resizable = single && RESIZABLE.has(single.type) && tool === 'select' && !editingId && !draft ? single : null
+  const resizable = single && RESIZABLE.has(single.type) && tool === 'select' && !editingId && !draft && !readOnly ? single : null
   useEffect(() => {
     const tr = trRef.current
     const stage = stageRef.current
@@ -516,7 +518,7 @@ export function Canvas(props: CanvasProps) {
     // `region` only matters through `regionKey`, which snaps while panning.
   }, [snapshot, regionKey, fullRender, selection, editingId])
 
-  const draggable = tool === 'select' && !panKey
+  const draggable = tool === 'select' && !panKey && !readOnly
   const s = camera.scale
   const selected = useMemo(() => new Set(selection), [selection])
 

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, Dispatch, SetStateAction } from 'react'
 import type Konva from 'konva'
 import { flushSync } from 'react-dom'
-import { nanoid } from 'nanoid'
+import { ApiError, api } from './api'
+import type { BoardAccess, User } from './api'
 import { Canvas, EDITABLE } from './canvas/Canvas'
 import { PeerCursors } from './canvas/PeerCursors'
 import { TextEditor } from './canvas/TextEditor'
@@ -12,13 +13,15 @@ import type { Camera } from './canvas/camera'
 import { contentBounds, downloadDataUrl, fileNameFor, renderBoardPng } from './canvas/exportPng'
 import { useBoardSnapshot, useConnectionStatus, useElementSize, usePeers } from './hooks'
 import { objectBounds, unionBoxes } from './model/geometry'
-import { loadIdentity, saveIdentity } from './sync/identity'
+import { navigate } from './router'
+import { MessageScreen } from './screens/MessageScreen'
 import type { Identity } from './sync/identity'
-import { openBoardSession } from './sync/session'
+import { ACCESS_CHANGED, openBoardSession } from './sync/session'
 import type { BoardSession } from './sync/session'
-import { DEFAULT_TOOL_OPTIONS, TOOL_KEYS } from './tools'
+import { DEFAULT_TOOL_OPTIONS, READ_ONLY_TOOLS, TOOL_KEYS } from './tools'
 import type { Tool, ToolOptions } from './tools'
 import { ContextBar } from './ui/ContextBar'
+import { ShareDialog } from './ui/ShareDialog'
 import { Toolbar } from './ui/Toolbar'
 import { TopBar } from './ui/TopBar'
 import { ZoomControls } from './ui/ZoomControls'
@@ -35,35 +38,79 @@ declare global {
   }
 }
 
-export function BoardScreen({ boardId }: { boardId: string }) {
-  const [identity, setIdentity] = useState<Identity>(loadIdentity)
-  const [session, setSession] = useState<BoardSession | null>(null)
-  const identityRef = useRef(identity)
-  identityRef.current = identity
+interface BoardScreenProps {
+  boardId: string
+  user: User
+  onSignOut(): void
+}
 
+/** Asks the server what you may do on the board, then opens it for real-time editing (or viewing). */
+export function BoardScreen({ boardId, user, onSignOut }: BoardScreenProps) {
+  const identity = useMemo<Identity>(() => ({ id: user.id, name: user.name, color: user.color }), [user])
+  const [access, setAccess] = useState<BoardAccess | null>(null)
+  const [problem, setProblem] = useState<ApiError | null>(null)
+  const [session, setSession] = useState<BoardSession | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      setAccess(await api.board(boardId))
+      setProblem(null)
+    } catch (err) {
+      setProblem(err instanceof ApiError ? err : new ApiError(0, 'Something went wrong'))
+    }
+  }, [boardId])
   useEffect(() => {
-    const opened = openBoardSession(boardId, identityRef.current)
+    void load()
+  }, [load])
+
+  const ready = access !== null && problem === null
+  useEffect(() => {
+    if (!ready) return
+    const opened = openBoardSession(boardId, identity)
+    // The server hangs up when our access changes (or the board is deleted): ask again.
+    const onClose = (event: CloseEvent | null) => {
+      if (event?.code === ACCESS_CHANGED) void load()
+    }
+    opened.provider.on('connection-close', onClose)
     setSession(opened)
     return () => {
+      opened.provider.off('connection-close', onClose)
       opened.destroy()
       setSession(null)
     }
-  }, [boardId])
+  }, [boardId, ready, identity, load])
 
-  useEffect(() => {
-    session?.awareness.setLocalStateField('user', identity)
-  }, [session, identity])
-
-  const renameSelf = () => {
-    const name = window.prompt('Your name on this board', identity.name)?.trim()
-    if (!name) return
-    const next = { ...identity, name: name.slice(0, 40) }
-    saveIdentity(next)
-    setIdentity(next)
+  if (problem) {
+    const home = { label: 'Go to my boards', onClick: () => navigate('/') }
+    if (problem.status === 404) {
+      return (
+        <MessageScreen title="Board not found" actions={[home]}>
+          This board does not exist, or it was deleted.
+        </MessageScreen>
+      )
+    }
+    if (problem.status === 403) {
+      return (
+        <MessageScreen title="You don’t have access to this board" actions={[home, { label: 'Use another account', onClick: onSignOut }]}>
+          You are signed in as {user.email}. Ask the board’s owner to invite you, or to open it to anyone with the link.
+        </MessageScreen>
+      )
+    }
+    if (problem.status === 401) {
+      return (
+        <MessageScreen title="Signed out" actions={[{ label: 'Sign in again', onClick: onSignOut }]}>
+          Your session has ended.
+        </MessageScreen>
+      )
+    }
+    return (
+      <MessageScreen title="Could not open the board" actions={[{ label: 'Try again', onClick: () => void load() }, home]}>
+        {problem.message}
+      </MessageScreen>
+    )
   }
-
-  if (!session) return <div className="loading">Opening board…</div>
-  return <BoardView session={session} identity={identity} onRenameSelf={renameSelf} />
+  if (!session || !access) return <div className="loading">Opening board…</div>
+  return <BoardView session={session} identity={identity} user={user} access={access} onAccessChange={setAccess} onSignOut={onSignOut} />
 }
 
 function gridStyle(camera: Camera): CSSProperties {
@@ -75,11 +122,15 @@ function gridStyle(camera: Camera): CSSProperties {
 interface BoardViewProps {
   session: BoardSession
   identity: Identity
-  onRenameSelf(): void
+  user: User
+  access: BoardAccess
+  onAccessChange(access: BoardAccess): void
+  onSignOut(): void
 }
 
-function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
+function BoardView({ session, identity, user, access, onAccessChange, onSignOut }: BoardViewProps) {
   const { board } = session
+  const readOnly = access.role === 'viewer'
   const snapshot = useBoardSnapshot(board)
   const status = useConnectionStatus(session.provider)
   const peers = usePeers(session.awareness, false)
@@ -98,6 +149,7 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
   const [panning, setPanning] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [fullRender, setFullRender] = useState(false)
+  const [sharing, setSharing] = useState(false)
 
   const cameraRef = useRef(camera)
   cameraRef.current = camera
@@ -113,10 +165,20 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
     setCameraState(next)
   }, [])
 
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
   const setTool = useCallback((next: Tool) => {
+    if (readOnlyRef.current && !READ_ONLY_TOOLS.has(next)) return
     setToolState(next)
     if (next !== 'select') setEditingId(null)
   }, [])
+
+  // Losing edit rights mid-session: drop whatever was being created or edited.
+  useEffect(() => {
+    if (!readOnly) return
+    setToolState((current) => (READ_ONLY_TOOLS.has(current) ? current : 'select'))
+    setEditingId(null)
+  }, [readOnly])
 
   const flash = useCallback((message: string) => {
     setNotice(message)
@@ -192,6 +254,15 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
     setSelection([])
   }, [board, selection])
 
+  const newBoard = async () => {
+    try {
+      const created = await api.createBoard()
+      navigate(`/b/${created.board.id}`)
+    } catch (err) {
+      flash((err as Error).message)
+    }
+  }
+
   const exportPng = () => {
     const stage = stageRef.current
     if (!stage) return
@@ -243,8 +314,8 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
   }, [setCamera])
 
   // Keyboard shortcuts. Handlers read the latest state through a ref.
-  const keyState = useRef({ selection, snapshot, duplicate, remove, fit, zoomAround })
-  keyState.current = { selection, snapshot, duplicate, remove, fit, zoomAround }
+  const keyState = useRef({ selection, snapshot, duplicate, remove, fit, zoomAround, readOnly })
+  keyState.current = { selection, snapshot, duplicate, remove, fit, zoomAround, readOnly }
   useEffect(() => {
     const typing = (target: EventTarget | null) =>
       target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
@@ -259,10 +330,11 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
         return
       }
       if (mod) {
-        if (key === 'z') e.shiftKey ? board.redo() : board.undo()
+        if (key === 'a') setSelection(state.snapshot.ordered.map((obj) => obj.id))
+        else if (state.readOnly && (key === 'z' || key === 'y' || key === 'd')) e.preventDefault()
+        else if (key === 'z') e.shiftKey ? board.redo() : board.undo()
         else if (key === 'y') board.redo()
         else if (key === 'd') state.duplicate()
-        else if (key === 'a') setSelection(state.snapshot.ordered.map((obj) => obj.id))
         else if (e.key === '=' || e.key === '+') state.zoomAround((s) => s * 1.25)
         else if (e.key === '-') state.zoomAround((s) => s / 1.25)
         else if (e.key === '0') state.zoomAround(() => 1)
@@ -272,7 +344,7 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
       }
       if (e.altKey) return
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (state.selection.length > 0) {
+        if (state.selection.length > 0 && !state.readOnly) {
           e.preventDefault()
           state.remove()
         }
@@ -283,7 +355,7 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
         setTool('select')
         return
       }
-      if (e.key === 'Enter' && state.selection.length === 1) {
+      if (e.key === 'Enter' && state.selection.length === 1 && !state.readOnly) {
         const obj = state.snapshot.byId.get(state.selection[0])
         if (obj && EDITABLE.has(obj.type)) {
           e.preventDefault()
@@ -381,6 +453,7 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
             stageRef={stageRef}
             overlayRef={overlayRef}
             fullRender={fullRender}
+            readOnly={readOnly}
           />
         )}
         <PeerCursors awareness={session.awareness} camera={camera} />
@@ -397,7 +470,13 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
         )}
         {snapshot.ordered.length === 0 && (
           <p className="empty-hint">
-            Pick a tool on the left, or press <kbd>S</kbd> and click to add a sticky note.
+            {readOnly ? (
+              'This board is empty.'
+            ) : (
+              <>
+                Pick a tool on the left, or press <kbd>S</kbd> and click to add a sticky note.
+              </>
+            )}
           </p>
         )}
       </div>
@@ -405,8 +484,9 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
       <TopBar
         title={snapshot.title}
         onRename={(title) => board.setTitle(title)}
-        identity={identity}
-        onRenameSelf={onRenameSelf}
+        readOnly={readOnly}
+        user={user}
+        onSignOut={onSignOut}
         peers={peers}
         status={status}
         canUndo={board.canUndo()}
@@ -414,10 +494,19 @@ function BoardView({ session, identity, onRenameSelf }: BoardViewProps) {
         onUndo={() => board.undo()}
         onRedo={() => board.redo()}
         onExport={exportPng}
-        onNewBoard={() => window.location.assign(`/b/${nanoid(10)}`)}
+        onNewBoard={newBoard}
+        onShare={() => setSharing(true)}
+        onHome={() => navigate('/')}
       />
-      <Toolbar tool={tool} options={options} onToolChange={setTool} onOptionsChange={(patch) => setOptions((o) => ({ ...o, ...patch }))} />
-      {!editingId && !panning && contextBarAt && (
+      <Toolbar
+        tool={tool}
+        options={options}
+        readOnly={readOnly}
+        onToolChange={setTool}
+        onOptionsChange={(patch) => setOptions((o) => ({ ...o, ...patch }))}
+      />
+      {sharing && <ShareDialog access={access} title={snapshot.title} onChange={onAccessChange} onClose={() => setSharing(false)} />}
+      {!editingId && !panning && contextBarAt && !readOnly && (
         <ContextBar board={board} selected={selectedObjects} position={contextBarAt} onDuplicate={duplicate} onDelete={remove} />
       )}
       <ZoomControls

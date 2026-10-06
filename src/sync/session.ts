@@ -29,6 +29,9 @@ export interface BoardSession {
 
 const BOARD_ID = /^[A-Za-z0-9_-]{1,64}$/
 
+/** Close code the server uses when your access to the board changed: ask again what you may do. */
+export const ACCESS_CHANGED = 4000
+
 export const isValidBoardId = (id: string): boolean => BOARD_ID.test(id)
 
 export function syncServerUrl(): string {

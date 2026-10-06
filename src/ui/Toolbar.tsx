@@ -2,6 +2,7 @@ import { Frame, Hand, MousePointer2, PenLine, Shapes, Spline, Stamp, StickyNote,
 import type { LucideIcon } from 'lucide-react'
 import { PEN_COLORS, SHAPE_COLORS, STAMPS, STICKY_COLORS } from '../model/palette'
 import type { ShapeKind } from '../model/types'
+import { READ_ONLY_TOOLS } from '../tools'
 import type { Tool, ToolOptions } from '../tools'
 import { ShapeKindPicker, Swatches } from './Swatches'
 
@@ -20,15 +21,18 @@ const TOOLS: { tool: Tool; label: string; shortcut: string; icon: LucideIcon }[]
 interface ToolbarProps {
   tool: Tool
   options: ToolOptions
+  /** Viewers only get the select and hand tools. */
+  readOnly: boolean
   onToolChange(tool: Tool): void
   onOptionsChange(patch: Partial<ToolOptions>): void
 }
 
-export function Toolbar({ tool, options, onToolChange, onOptionsChange }: ToolbarProps) {
+export function Toolbar({ tool, options, readOnly, onToolChange, onOptionsChange }: ToolbarProps) {
+  const tools = readOnly ? TOOLS.filter(({ tool: t }) => READ_ONLY_TOOLS.has(t)) : TOOLS
   return (
     <div className="toolbar-dock">
       <nav className="panel toolbar" aria-label="Tools">
-        {TOOLS.map(({ tool: t, label, shortcut, icon: Icon }) => (
+        {tools.map(({ tool: t, label, shortcut, icon: Icon }) => (
           <button
             key={t}
             type="button"
@@ -47,7 +51,7 @@ export function Toolbar({ tool, options, onToolChange, onOptionsChange }: Toolba
   )
 }
 
-function ToolOptionsPanel({ tool, options, onOptionsChange }: Omit<ToolbarProps, 'onToolChange'>) {
+function ToolOptionsPanel({ tool, options, onOptionsChange }: Omit<ToolbarProps, 'onToolChange' | 'readOnly'>) {
   switch (tool) {
     case 'sticky':
       return (

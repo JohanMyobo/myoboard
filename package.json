@@ -6,7 +6,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+    "node": "^22.13.0 || ^24.0.0 || >=26.0.0"
   },
   "scripts": {
     "dev": "concurrently -k -n web,sync -c blue,magenta \"vite\" \"tsx watch server/index.ts --port 1234 --host 127.0.0.1 --no-static\"",
@@ -25,6 +25,7 @@
     "lib0": "^0.2.117",
     "lucide-react": "^1.52.0",
     "nanoid": "^6.0.2",
+    "openid-client": "^6.8.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-konva": "^19.3.0",
@@ -44,6 +45,7 @@
     "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^6.1.2",
     "concurrently": "^10.0.5",
+    "jose": "^6.2.12",
     "typescript": "^7.0.2",
     "vite": "^8.3.3",
     "vitest": "^5.0.3"

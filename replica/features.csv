@@ -11,7 +11,8 @@ Real-time multiplayer editing,collaboration,must,yes,yes,property-level merge
 Live cursors with names,collaboration,must,yes,yes,
 Share a board with a link,sharing,must,yes,yes,
 Autosave,persistence,must,yes,yes,server file plus browser copy
-Sign-in and per-board permissions,accounts,must,yes,no,anyone with the link can edit
+Sign-in and per-board permissions,accounts,must,yes,yes,company accounts through OpenID Connect (Google or Microsoft) or name and email locally; owner editor viewer; link access
+Board list with recent owned and shared boards,accounts,should,yes,yes,search and filters; owners delete boards
 Sections that group content,sections,should,yes,yes,content moves with the section
 Pen drawing,drawing,should,yes,yes,3 widths and 6 colours
 Reaction stamps,reactions,should,yes,yes,8 emoji

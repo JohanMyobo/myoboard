@@ -20,6 +20,13 @@ time between everyone on the same board.
 - **Resilient**: every board is saved on the server and kept in the browser
   (IndexedDB), so it opens instantly and keeps working through a dropped
   connection.
+- **Accounts and permissions**: sign in with your company's Google or
+  Microsoft account (OpenID Connect). Each board has an owner who invites
+  people as editors or viewers and decides what the link gives everyone
+  else: nothing, viewing or editing. Viewers see changes live but can
+  change nothing, enforced by the server.
+- **Your boards**: one page lists the boards you own, were invited to or
+  opened, with search and filters.
 - **Sharing and export**: one link per board, editable title, PNG export of
   the whole board.
 - Pans at a median 60 fps with 500 sticky notes, measured in headless
@@ -27,7 +34,7 @@ time between everyone on the same board.
 
 ## Run it
 
-Requires Node.js 22.12 or newer, on the 22 or 24 line.
+Requires Node.js 22.13 or newer on the 22 line, 24, or 26 and newer.
 
 ```bash
 npm ci
@@ -35,23 +42,47 @@ npm start
 ```
 
 `npm start` builds the app and serves it, with real-time sync, on
-<http://localhost:3000>. Opening it creates a new board; share its address
-with anyone who can reach the machine.
+<http://localhost:3000>. Without further setup you sign in with a name and an
+email, which nobody checks: fine to try it on your machine. Before sharing
+the server, connect your company's accounts (next section).
 
-| Flag         | Variable   | Default   | Purpose                                               |
-| ------------ | ---------- | --------- | ----------------------------------------------------- |
-| `--port`     | `PORT`     | `3000`    | HTTP and WebSocket port                               |
-| `--host`     | `HOST`     | `0.0.0.0` | Interface to listen on; `127.0.0.1` keeps it local    |
-| `--data-dir` | `DATA_DIR` | `./data`  | Where boards are saved (one file each)                |
+| Flag           | Variable     | Default   | Purpose                                                   |
+| -------------- | ------------ | --------- | --------------------------------------------------------- |
+| `--port`       | `PORT`       | `3000`    | HTTP and WebSocket port                                   |
+| `--host`       | `HOST`       | `0.0.0.0` | Interface to listen on; `127.0.0.1` keeps it local        |
+| `--data-dir`   | `DATA_DIR`   | `./data`  | Where boards, accounts and images are saved               |
+| `--public-url` | `PUBLIC_URL` | (none)    | The address people use, e.g. `https://board.example.com`  |
 
 Pass flags after `--`, as in `npm start -- --port 4000`.
 
 For development, `npm run dev` runs Vite with hot reload on
-<http://localhost:5173> and the sync server on port 1234.
+<http://localhost:5173> and the API and sync server on port 1234.
 
-> **No sign-in yet.** Anyone who has a board's link can edit it. Run Myoboard
-> on a trusted network or behind your own authentication (reverse proxy, SSO)
-> until accounts and permissions land.
+### Sign in with your company's accounts
+
+Myoboard speaks OpenID Connect, so it works with Google Workspace, Microsoft
+Entra ID (Office 365) or any other OIDC provider. Nobody has a password to
+manage. Register Myoboard as a web application with your provider, with
+`<PUBLIC_URL>/auth/callback` as the redirect URI, then set:
+
+| Variable               | Purpose                                                                 |
+| ---------------------- | ----------------------------------------------------------------------- |
+| `OIDC_ISSUER`          | Google: `https://accounts.google.com`; Microsoft: `https://login.microsoftonline.com/<tenant id>/v2.0` |
+| `OIDC_CLIENT_ID`       | From your provider                                                      |
+| `OIDC_CLIENT_SECRET`   | From your provider                                                      |
+| `OIDC_ALLOWED_DOMAINS` | Optional, comma-separated: only these email domains get in, e.g. `example.com` |
+| `OIDC_PROVIDER_NAME`   | Optional: the sign-in button says "Continue with …"; guessed for Google and Microsoft |
+| `PUBLIC_URL`           | The address people use; it must match the redirect URI you registered  |
+
+- **Google**: in Google Cloud Console, *APIs & Services → Credentials →
+  Create OAuth client ID → Web application*. Set the consent screen to
+  *Internal* so only your Workspace accounts can sign in.
+- **Microsoft**: in the Entra admin centre, *App registrations → New
+  registration*, single tenant, redirect URI of type *Web*; then create a
+  client secret under *Certificates & secrets*.
+
+With a single-tenant Microsoft app or an internal Google app, only your
+company's accounts can sign in; `OIDC_ALLOWED_DOMAINS` adds a second check.
 
 ## Keyboard shortcuts
 
@@ -85,10 +116,17 @@ browser                                        server (one Node process)
   property (last writer wins), so two people moving and recolouring the same
   sticky never conflict. A fractional `index` orders objects back to front.
   Built on [Yjs](https://github.com/yjs/yjs).
-- **Sync server** (`server/`): serves the built app, speaks the y-websocket
-  protocol on `/ws/<board>`, relays presence (cursors, selections) and saves
-  each board as a Yjs update file. Board ids are restricted to a safe
-  alphabet because they become file names.
+- **Server** (`server/`): one Node process serves the built app, the JSON
+  API under `/api`, board images under `/media`, sign-in under `/auth` and
+  the y-websocket protocol on `/ws/<board>`. It relays presence (cursors,
+  selections) and saves each board as a Yjs update file. Accounts,
+  sessions, board owners, invitations and team templates live in a SQLite
+  database (`DATA_DIR/myoboard.db`, Node's built-in `node:sqlite`). Board
+  ids are restricted to a safe alphabet because they become file names.
+- **Permissions**: the server checks your role when the WebSocket opens.
+  It never applies edits sent by a viewer, and when an owner changes
+  someone's access it disconnects them so they come back with their new
+  role.
 - **Canvas** (`src/canvas`): [Konva](https://konvajs.org) through
   react-konva. Only objects near the screen are drawn, and text is skipped
   when zoomed out too far to read.
@@ -103,10 +141,14 @@ npm test            # unit tests + sync server tests with real WebSocket clients
 npm run test:e2e    # Playwright: builds the app and drives real browsers
 ```
 
-The end-to-end suite checks two people editing the same board live (edits,
-drags, cursors, presence), persistence across reloads and devices,
-connectors, sections and undo, pen strokes, shapes, stamps and PNG export,
-and frame times with 500 sticky notes. It needs a Chromium: run
+The server tests cover accounts, permissions (including a viewer trying
+to edit through the sync protocol), images and a complete OpenID Connect
+sign-in against a local test provider. The end-to-end suite checks
+signing in and the board list, sharing with viewers and editors live, two
+people editing the same board (edits, drags, cursors, presence),
+persistence across reloads and devices, connectors, sections and undo, pen
+strokes, shapes, stamps and PNG export, and frame times with 500 sticky
+notes. GitHub Actions runs everything on Node 22 and 24 for every push. It needs a Chromium: run
 `npx playwright install chromium` once, set `PW_CHANNEL=chrome` or
 `PW_CHANNEL=msedge` to use an installed Chrome or Edge, or point
 `CHROMIUM_PATH` at any Chromium binary.
@@ -127,11 +169,21 @@ articles about real-time editing and public product documentation. No
 proprietary code, private API, asset, icon, copy or branding was used. The
 feature matrix and parity score are in [`replica/`](replica).
 
+## Security
+
+- Sessions are random tokens in an `HttpOnly`, `SameSite=Lax` cookie
+  (`Secure` when `PUBLIC_URL` is https), stored hashed. Requests that change
+  something, and WebSocket connections, must come from the app's own origin.
+- Without OIDC, anyone can sign in as anyone: keep such a server on your
+  own machine. The server warns when it listens on the network that way.
+- An editor can change anything on a board, as on any whiteboard.
+- Put the server behind HTTPS (a reverse proxy) when it leaves your laptop.
+
 ## Not built yet
 
-Sign-in and permissions, comments, images, templates, voting, timer, rich
-text, copy and paste, elbow connectors with labels. See
-[`replica/parity.md`](replica/parity.md) for the full list, in build order.
+Comments, images, templates, voting, timer, rich text, copy and paste,
+elbow connectors with labels. See [`replica/parity.md`](replica/parity.md)
+for the full list, in build order.
 
 ## License
 

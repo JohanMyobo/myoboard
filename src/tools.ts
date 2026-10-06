@@ -22,6 +22,9 @@ export const DEFAULT_TOOL_OPTIONS: ToolOptions = {
   stamp: STAMPS[0],
 }
 
+/** What a viewer can still use. */
+export const READ_ONLY_TOOLS: ReadonlySet<Tool> = new Set(['select', 'hand'])
+
 /** Single-key shortcuts (without modifiers). */
 export const TOOL_KEYS: Record<string, Tool> = {
   v: 'select',

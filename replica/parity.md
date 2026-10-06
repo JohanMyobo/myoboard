@@ -1,11 +1,10 @@
-## Parity: 64.4 / 100
+## Parity: 68.9 / 100
 
-features 64.4  (38 counted, must-haves 10 of 13 done)
+features 68.9  (39 counted, must-haves 11 of 13 done)
 
-Not shippable yet: 3 must-have features are not done.
+Not shippable yet: 2 must-have features are not done.
 
 ## By area, weakest first
-- accounts                       0.0  (1 features)
 - comments                       0.0  (1 features)
 - media                          0.0  (1 features)
 - templates                      0.0  (1 features)
@@ -25,10 +24,10 @@ Not shippable yet: 3 must-have features are not done.
 - sticky notes                 100.0  (1 features)
 - sharing                      100.0  (1 features)
 - persistence                  100.0  (1 features)
+- accounts                     100.0  (2 features)
 - sections                     100.0  (1 features)
 
 ## Missing, in build order
-- [must] accounts: Sign-in and per-board permissions, no  (anyone with the link can edit)
 - [must] connectors: Connectors attached to objects, partial  (straight with an arrowhead; no elbows curves or labels)
 - [must] shapes: Shapes with a label, partial  (rectangle ellipse and diamond only)
 - [should] comments: Comments, no

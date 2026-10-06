@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// In dev, the sync server runs on its own port (see `npm run dev`) and Vite
-// forwards /ws to it, so the client always connects to `<host>/ws`.
+const SERVER = 'http://127.0.0.1:1234'
+
+// In dev, the API and sync server runs on its own port (see `npm run dev`) and
+// Vite forwards its paths to it, so the client always talks to its own origin.
 export default defineConfig({
   plugins: [react()],
   build: {
@@ -12,6 +14,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/ws': { target: 'ws://127.0.0.1:1234', ws: true },
+      '/api': SERVER,
+      '/auth': SERVER,
+      '/media': SERVER,
     },
   },
 })

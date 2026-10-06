@@ -25,7 +25,22 @@ export interface RoomManagerOptions {
   saveDelayMs?: number
   /** ...but never later than this after the first unsaved edit. */
   maxSaveDelayMs?: number
+  /** Called when a board's title changes (and when a board with a title opens). */
+  onTitle?(board: string, title: string): void
+  /** A title to give a board that has none yet (one chosen when it was created). */
+  initialTitle?(board: string): string | undefined
+  /** Called after a board is saved, with the time of its last edit. */
+  onSaved?(board: string, editedAt: number): void
 }
+
+/** Who is on the other end of a connection, and whether they may edit. */
+export interface Participant {
+  userId: string
+  readOnly: boolean
+}
+
+/** Close code that tells the client its access changed: it reconnects and asks again. */
+export const ACCESS_CHANGED = 4000
 
 type AwarenessChange = { added: number[]; updated: number[]; removed: number[] }
 
@@ -42,35 +57,58 @@ function send(conn: WebSocket, message: Uint8Array): void {
   })
 }
 
+interface Connection extends Participant {
+  /** Awareness client ids this connection controls. */
+  controlled: Set<number>
+}
+
 /** One board: its document, who is connected, and their presence. */
 class Room {
   readonly doc = new Y.Doc()
   readonly awareness = new awarenessProtocol.Awareness(this.doc)
-  /** Each connection, with the awareness client ids it controls. */
-  readonly conns = new Map<WebSocket, Set<number>>()
+  readonly conns = new Map<WebSocket, Connection>()
 
   private saveTimer: NodeJS.Timeout | null = null
   private firstUnsavedAt = 0
+  private lastEditAt = 0
   private dirty = false
   private closed = false
 
   constructor(
+    private readonly name: string,
     private readonly file: string | null,
     private readonly saveDelayMs: number,
     private readonly maxSaveDelayMs: number,
+    private readonly hooks: Pick<RoomManagerOptions, 'onTitle' | 'onSaved' | 'initialTitle'>,
   ) {
     if (file && fs.existsSync(file)) Y.applyUpdate(this.doc, fs.readFileSync(file))
     this.awareness.setLocalState(null) // the server has no cursor of its own
     this.doc.on('update', this.handleUpdate)
     this.awareness.on('update', this.handleAwarenessUpdate)
+    const meta = this.doc.getMap('meta')
+    const reportTitle = () => {
+      const title = meta.get('title')
+      // Runs inside Yjs transactions: a failure here must not reject the update.
+      try {
+        if (typeof title === 'string') this.hooks.onTitle?.(this.name, title)
+      } catch (err) {
+        console.error(`[sync] could not record the title of ${this.name}:`, err)
+      }
+    }
+    meta.observe(reportTitle)
+    if (typeof meta.get('title') !== 'string') {
+      const initial = this.hooks.initialTitle?.(this.name)
+      if (initial) meta.set('title', initial)
+    }
+    reportTitle()
   }
 
   get persistent(): boolean {
     return this.file !== null
   }
 
-  join(conn: WebSocket): void {
-    this.conns.set(conn, new Set())
+  join(conn: WebSocket, participant: Participant): void {
+    this.conns.set(conn, { ...participant, controlled: new Set() })
     conn.on('message', (data) => this.handleMessage(conn, toBytes(data)))
 
     const encoder = encoding.createEncoder()
@@ -88,7 +126,7 @@ class Room {
   }
 
   leave(conn: WebSocket): void {
-    const controlled = this.conns.get(conn)
+    const controlled = this.conns.get(conn)?.controlled
     this.conns.delete(conn)
     if (controlled && controlled.size > 0) {
       awarenessProtocol.removeAwarenessStates(this.awareness, [...controlled], null)
@@ -112,12 +150,28 @@ class Room {
       // and try again. A closed room gives up; its clients still hold the edits.
       console.error(`[sync] could not save ${this.file}:`, err)
       if (!this.closed) this.scheduleSave()
+      return
+    }
+    try {
+      this.hooks.onSaved?.(this.name, this.lastEditAt)
+    } catch (err) {
+      console.error(`[sync] could not record when ${this.name} was saved:`, err)
     }
   }
 
   destroy(): void {
     this.closed = true
     this.save()
+    this.awareness.destroy()
+    this.doc.destroy()
+  }
+
+  /** Drops the board without saving it (it was deleted). */
+  discard(): void {
+    this.closed = true
+    this.dirty = false
+    if (this.saveTimer) clearTimeout(this.saveTimer)
+    for (const conn of this.conns.keys()) conn.close(ACCESS_CHANGED, 'board deleted')
     this.awareness.destroy()
     this.doc.destroy()
   }
@@ -129,7 +183,15 @@ class Room {
       if (type === MESSAGE_SYNC) {
         const reply = encoding.createEncoder()
         encoding.writeVarUint(reply, MESSAGE_SYNC)
-        syncProtocol.readSyncMessage(decoder, reply, this.doc, conn)
+        const step = decoding.readVarUint(decoder)
+        if (step === syncProtocol.messageYjsSyncStep1) {
+          syncProtocol.readSyncStep1(decoder, reply, this.doc)
+        } else if (step === syncProtocol.messageYjsSyncStep2 || step === syncProtocol.messageYjsUpdate) {
+          // Viewers get every change but their own edits never reach the board.
+          if (!this.conns.get(conn)?.readOnly) syncProtocol.readSyncStep2(decoder, this.doc, conn)
+        } else {
+          throw new Error(`unknown sync message ${step}`)
+        }
         if (encoding.length(reply) > 1) send(conn, encoding.toUint8Array(reply))
       } else if (type === MESSAGE_AWARENESS) {
         awarenessProtocol.applyAwarenessUpdate(this.awareness, decoding.readVarUint8Array(decoder), conn)
@@ -152,7 +214,7 @@ class Room {
   }
 
   private readonly handleAwarenessUpdate = ({ added, updated, removed }: AwarenessChange, origin: unknown): void => {
-    const controlled = origin instanceof WebSocket ? this.conns.get(origin) : undefined
+    const controlled = origin instanceof WebSocket ? this.conns.get(origin)?.controlled : undefined
     if (controlled) {
       for (const id of added) controlled.add(id)
       for (const id of removed) controlled.delete(id)
@@ -166,9 +228,10 @@ class Room {
   }
 
   private scheduleSave(): void {
-    if (!this.file) return
+    if (!this.file || this.closed) return
     this.dirty = true
     const now = Date.now()
+    this.lastEditAt = now
     if (!this.firstUnsavedAt) this.firstUnsavedAt = now
     if (this.saveTimer) clearTimeout(this.saveTimer)
     const wait = Math.max(0, Math.min(this.saveDelayMs, this.firstUnsavedAt + this.maxSaveDelayMs - now))
@@ -195,18 +258,22 @@ export class RoomManager {
     return this.rooms.size
   }
 
-  connect(conn: WebSocket, name: string): void {
+  /** Where a board is saved, or null when boards live in memory. */
+  fileFor(name: string): string | null {
+    return this.options.dataDir ? path.join(this.options.dataDir, `${name}.ybin`) : null
+  }
+
+  connect(conn: WebSocket, name: string, participant: Participant): void {
     if (!isValidRoomName(name)) {
       conn.close(1008, 'invalid board id')
       return
     }
     let room = this.rooms.get(name)
     if (!room) {
-      const file = this.options.dataDir ? path.join(this.options.dataDir, `${name}.ybin`) : null
-      room = new Room(file, this.saveDelayMs, this.maxSaveDelayMs)
+      room = new Room(name, this.fileFor(name), this.saveDelayMs, this.maxSaveDelayMs, this.options)
       this.rooms.set(name, room)
     }
-    room.join(conn)
+    room.join(conn, participant)
 
     let alive = true
     conn.on('pong', () => {
@@ -230,6 +297,28 @@ export class RoomManager {
         joined.destroy()
       }
     })
+  }
+
+  /**
+   * Re-checks everyone on a board after its permissions changed. Whoever lost
+   * access, or went from editor to viewer or back, is disconnected with
+   * ACCESS_CHANGED; their client reconnects and picks up its new role.
+   */
+  refreshAccess(name: string, readOnlyFor: (userId: string) => boolean | null): void {
+    const room = this.rooms.get(name)
+    if (!room) return
+    for (const [conn, info] of room.conns) {
+      const readOnly = readOnlyFor(info.userId)
+      if (readOnly !== info.readOnly) conn.close(ACCESS_CHANGED, 'access changed')
+    }
+  }
+
+  /** Disconnects everyone and forgets a deleted board without saving it. */
+  discard(name: string): void {
+    const room = this.rooms.get(name)
+    if (!room) return
+    this.rooms.delete(name)
+    room.discard()
   }
 
   /** Writes every open board to disk now (used on shutdown). */
