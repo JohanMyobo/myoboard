@@ -5,6 +5,10 @@ import react from '@vitejs/plugin-react'
 // forwards /ws to it, so the client always connects to `<host>/ws`.
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // React, Konva and Yjs make one ~700 kB bundle (~220 kB gzipped); fine for a canvas app.
+    chunkSizeWarningLimit: 800,
+  },
   server: {
     proxy: {
       '/ws': { target: 'ws://localhost:1234', ws: true },

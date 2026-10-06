@@ -19,7 +19,6 @@ export type Lookup = (id: string) => BoardObject | undefined
 export const STICKY_PADDING = 16
 export const STICKY_AUTHOR_SPACE = 18
 export const STAMP_RADIUS = 20
-export const SECTION_TITLE_HEIGHT = 28
 
 /** Average glyph width as a fraction of the font size, for layout estimates. */
 const CHAR_WIDTH = 0.56
