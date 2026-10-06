@@ -15,7 +15,7 @@ don't publish packages or releases unless the user asks.
 
 ## Get it running
 
-1. `node --version` must be 22.12+ or 24 (`.nvmrc` pins 22); the
+1. `node --version` must be 22.12+, 24 or 26+ (`.nvmrc` pins 22); the
    dependencies don't support 22.0–22.11, 23 or 25. If it doesn't match,
    stop and ask the user to switch (`nvm use`, `fnm use` or the Node
    installer) rather than working around it.
@@ -73,8 +73,8 @@ suggest the user sets it once in `.claude/settings.local.json` (personal,
 git-ignored): `{ "env": { "PW_CHANNEL": "msedge" } }`.
 
 The performance test fails if panning across 500 sticky notes takes a median
-of 34 ms or more per frame; headless Chromium without a GPU measures about
-17 ms.
+of 34 ms or more per frame, zoomed to fit, at 26% or at 100%; headless
+Chromium without a GPU and Chrome on macOS both measure about 17 ms.
 
 ## Map
 
@@ -124,9 +124,11 @@ replica/             feature matrix, parity score, recon notes
   the protocol with `y-protocols` instead.
 - 500 objects pan at 60 fps because: nodes are `memo` components that all
   receive one stable `handlers` object (no inline callbacks or fresh objects
-  as props); only objects near the viewport are drawn (`drawRegion`); text is
-  skipped below 25% zoom (`LOW_DETAIL_SCALE`). PNG export sets `fullRender`
-  to draw everything: keep it working if you touch culling.
+  as props); only objects near the viewport are drawn (`drawRegion`); text and
+  shadows are skipped below 25% zoom (`LOW_DETAIL_SCALE`); a sticky note's
+  shadow is one pre-blurred bitmap, never Konva's `shadowBlur`, which costs
+  about 100 ms a frame with a few hundred notes in Chrome on macOS. PNG export
+  sets `fullRender` to draw everything: keep it working if you touch culling.
 - Sticky notes, text and stamps are created on pointer release and their
   editor is focused synchronously. Creating them on pointer down loses the
   first typed character.

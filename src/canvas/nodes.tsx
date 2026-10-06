@@ -1,5 +1,6 @@
 import { memo } from 'react'
-import { Arrow, Circle, Ellipse, Group, Label, Line, Rect, Tag, Text } from 'react-konva'
+import { Arrow, Circle, Ellipse, Group, Label, Line, Rect, Shape, Tag, Text } from 'react-konva'
+import type { Context } from 'konva/lib/Context'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import { ACCENT, FONT_FAMILY, INK, LINE_HEIGHT, textColorOn } from '../model/palette'
 import {
@@ -58,23 +59,49 @@ function groupProps(obj: { id: string; x: number; y: number }, draggable: boolea
   }
 }
 
+// A canvas shadow blur under every sticky note costs about 100 ms a frame with
+// a few hundred notes on screen (Chrome on macOS). So the shadow is blurred
+// once, into a bitmap that is stretched under each note: nearly free to draw.
+const SHADOW_BASE = 200
+const SHADOW_PAD = 24
+const SHADOW_RES = 2
+let stickyShadow: HTMLCanvasElement | undefined
+
+function stickyShadowImage(): HTMLCanvasElement {
+  if (stickyShadow) return stickyShadow
+  const size = (SHADOW_BASE + SHADOW_PAD * 2) * SHADOW_RES
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  // Draw the note off the canvas and offset its shadow back in, so only the
+  // shadow lands. Shadow settings are in device pixels, hence SHADOW_RES.
+  ctx.shadowColor = 'rgba(29,29,27,0.14)'
+  ctx.shadowBlur = 10 * SHADOW_RES
+  ctx.shadowOffsetX = size
+  ctx.shadowOffsetY = 3 * SHADOW_RES
+  ctx.beginPath()
+  ctx.roundRect(SHADOW_PAD * SHADOW_RES - size, SHADOW_PAD * SHADOW_RES, SHADOW_BASE * SHADOW_RES, SHADOW_BASE * SHADOW_RES, 4 * SHADOW_RES)
+  ctx.fill()
+  stickyShadow = canvas
+  return canvas
+}
+
+function drawStickyShadow(ctx: Context, w: number, h: number) {
+  const image = stickyShadowImage()
+  const sx = w / SHADOW_BASE
+  const sy = h / SHADOW_BASE
+  ctx.drawImage(image, -SHADOW_PAD * sx, -SHADOW_PAD * sy, (image.width / SHADOW_RES) * sx, (image.height / SHADOW_RES) * sy)
+}
+
 export const StickyNode = memo(function StickyNode({ obj, draggable, editing, lowDetail, handlers }: NodeProps<StickyObject>) {
   const box = stickyTextBox(obj.w, obj.h)
   const fontSize = fitFontSize(obj.text, box.width, box.height)
   return (
     <Group {...groupProps(obj, draggable, handlers)}>
-      <Rect
-        width={obj.w}
-        height={obj.h}
-        fill={obj.color}
-        cornerRadius={4}
-        shadowColor="#1d1d1b"
-        shadowOpacity={0.14}
-        shadowBlur={10}
-        shadowOffsetY={3}
-        shadowForStrokeEnabled={false}
-        perfectDrawEnabled={false}
-      />
+      {/* No size, so the resize handles keep fitting the note, not its shadow. */}
+      {!lowDetail && <Shape listening={false} sceneFunc={(ctx) => drawStickyShadow(ctx, obj.w, obj.h)} />}
+      <Rect width={obj.w} height={obj.h} fill={obj.color} cornerRadius={4} perfectDrawEnabled={false} />
       {!editing && !lowDetail && (
         <Text
           x={STICKY_PADDING}
