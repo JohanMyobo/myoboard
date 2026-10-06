@@ -1,0 +1,42 @@
+feature,area,priority,original,clone,notes
+Infinite canvas with pan and zoom,canvas,must,yes,yes,
+Sticky notes in several colours,sticky notes,must,yes,yes,8 colours; text shrinks to fit; author shown
+Edit text directly on the canvas,editing,must,yes,yes,
+Shapes with a label,shapes,must,yes,partial,rectangle ellipse and diamond only
+Connectors attached to objects,connectors,must,yes,partial,straight with an arrowhead; no elbows curves or labels
+Select move and resize objects,editing,must,yes,yes,
+Multi-select with Shift and a selection box,editing,must,yes,yes,
+Undo and redo,editing,must,yes,yes,only your own edits as in the original
+Real-time multiplayer editing,collaboration,must,yes,yes,property-level merge
+Live cursors with names,collaboration,must,yes,yes,
+Share a board with a link,sharing,must,yes,yes,
+Autosave,persistence,must,yes,yes,server file plus browser copy
+Sign-in and per-board permissions,accounts,must,yes,no,anyone with the link can edit
+Sections that group content,sections,should,yes,yes,content moves with the section
+Pen drawing,drawing,should,yes,yes,3 widths and 6 colours
+Reaction stamps,reactions,should,yes,yes,8 emoji
+Free text,text,should,yes,yes,
+Duplicate delete and bring to front,editing,should,yes,yes,
+Change colour and shape from the selection,editing,should,yes,yes,
+See who is on the board,collaboration,should,yes,yes,
+See what others have selected,collaboration,should,yes,yes,
+Export the board as an image,export,should,yes,partial,PNG only
+Comments,comments,should,yes,no,
+Images and file uploads,media,should,yes,no,
+Copy and paste,editing,should,yes,partial,duplicate only
+Templates,templates,should,yes,no,
+Voting sessions,facilitation,should,yes,no,
+Timer,facilitation,should,yes,no,
+Rich text (bold lists sizes),text,should,yes,no,
+Tables,tables,could,yes,no,
+Cursor chat,collaboration,could,yes,no,
+Emotes and high fives,reactions,could,yes,no,
+Follow or spotlight a collaborator,collaboration,could,yes,no,
+Highlighter and washi tape,drawing,could,yes,no,
+Code blocks,text,could,yes,no,
+Audio chat,collaboration,could,yes,no,
+AI board generation and summaries,ai,could,yes,no,
+Touch and mobile,platform,could,yes,partial,pointer events and a compact toolbar; no pinch zoom
+Widgets and plugin marketplace,extensibility,could,yes,skip,their developer ecosystem is not part of the product to rebuild
+Works offline and syncs on reconnect,persistence,could,no,yes,added: local IndexedDB copy
+Self-hosted under an open-source licence,platform,could,no,yes,added: MIT
