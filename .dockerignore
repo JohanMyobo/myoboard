@@ -1,0 +1,14 @@
+.env
+.env.*
+node_modules
+dist
+data
+.e2e-data
+.e2e-probe
+test-results
+playwright-report
+.git
+.github
+.claude
+*.log
+.DS_Store

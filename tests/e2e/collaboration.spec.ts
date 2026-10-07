@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addSticky, boardIdFor, drag, objects, objectsOfType, openBoard, scale, texts, toScreen } from './helpers'
+import { addSticky, boardIdFor, drag, nextFrames, objects, objectsOfType, openBoard, scale, texts, toScreen } from './helpers'
 
 test('two people see each other’s edits and cursors live', async ({ browser }, info) => {
   const boardId = boardIdFor(info)
@@ -92,6 +92,7 @@ test('connectors follow objects, sections carry their content, undo reverts', as
   // Undo puts everything back.
   await page.keyboard.press('Control+z')
   await expect.poll(async () => (await objectsOfType(page, 'sticky'))[0].x).toBe(a.x)
+  await nextFrames(page)
 
   // Deleting a sticky removes the connector attached to it.
   const aNow = (await objectsOfType(page, 'sticky'))[0]
@@ -134,7 +135,8 @@ test('pen strokes, shapes with text, stamps and PNG export', async ({ page }, in
 
   // Export downloads a PNG of the whole board.
   const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export PNG' }).click()
+  await page.getByRole('button', { name: 'Export', exact: true }).click()
+  await page.getByRole('button', { name: 'PNG image' }).click()
   const file = await (await download).path()
   const { readFileSync } = await import('node:fs')
   const bytes = readFileSync(file!)

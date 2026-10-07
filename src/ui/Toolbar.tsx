@@ -1,8 +1,10 @@
-import { Frame, Hand, MousePointer2, PenLine, Shapes, Spline, Stamp, StickyNote, Type } from 'lucide-react'
+import { Frame, Hand, ImagePlus, MessageCircle, MousePointer2, PenLine, Shapes, Spline, Stamp, StickyNote, Type } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { PEN_COLORS, SHAPE_COLORS, STAMPS, STICKY_COLORS } from '../model/palette'
 import type { ShapeKind } from '../model/types'
+import { READ_ONLY_TOOLS } from '../tools'
 import type { Tool, ToolOptions } from '../tools'
+import { CONNECTOR_STYLES } from './ContextBar'
 import { ShapeKindPicker, Swatches } from './Swatches'
 
 const TOOLS: { tool: Tool; label: string; shortcut: string; icon: LucideIcon }[] = [
@@ -15,20 +17,26 @@ const TOOLS: { tool: Tool; label: string; shortcut: string; icon: LucideIcon }[]
   { tool: 'connector', label: 'Connector', shortcut: 'C', icon: Spline },
   { tool: 'section', label: 'Section', shortcut: 'F', icon: Frame },
   { tool: 'stamp', label: 'Stamp', shortcut: 'E', icon: Stamp },
+  { tool: 'comment', label: 'Comment', shortcut: 'M', icon: MessageCircle },
 ]
 
 interface ToolbarProps {
   tool: Tool
   options: ToolOptions
+  /** Viewers only get the select and hand tools. */
+  readOnly: boolean
+  /** Opens the file picker; an image is added rather than drawn, so it is not a tool. */
+  onAddImage(): void
   onToolChange(tool: Tool): void
   onOptionsChange(patch: Partial<ToolOptions>): void
 }
 
-export function Toolbar({ tool, options, onToolChange, onOptionsChange }: ToolbarProps) {
+export function Toolbar({ tool, options, readOnly, onAddImage, onToolChange, onOptionsChange }: ToolbarProps) {
+  const tools = readOnly ? TOOLS.filter(({ tool: t }) => READ_ONLY_TOOLS.has(t)) : TOOLS
   return (
     <div className="toolbar-dock">
       <nav className="panel toolbar" aria-label="Tools">
-        {TOOLS.map(({ tool: t, label, shortcut, icon: Icon }) => (
+        {tools.map(({ tool: t, label, shortcut, icon: Icon }) => (
           <button
             key={t}
             type="button"
@@ -41,13 +49,18 @@ export function Toolbar({ tool, options, onToolChange, onOptionsChange }: Toolba
             <Icon size={20} strokeWidth={1.75} />
           </button>
         ))}
+        {!readOnly && (
+          <button type="button" className="tool-button" aria-label="Image" title="Image (I)" onClick={onAddImage}>
+            <ImagePlus size={20} strokeWidth={1.75} />
+          </button>
+        )}
       </nav>
       <ToolOptionsPanel tool={tool} options={options} onOptionsChange={onOptionsChange} />
     </div>
   )
 }
 
-function ToolOptionsPanel({ tool, options, onOptionsChange }: Omit<ToolbarProps, 'onToolChange'>) {
+function ToolOptionsPanel({ tool, options, onOptionsChange }: Pick<ToolbarProps, 'tool' | 'options' | 'onOptionsChange'>) {
   switch (tool) {
     case 'sticky':
       return (
@@ -76,6 +89,25 @@ function ToolOptionsPanel({ tool, options, onOptionsChange }: Omit<ToolbarProps,
                 onClick={() => onOptionsChange({ penWidth: width })}
               >
                 <span className="pen-dot" style={{ width: width + 2, height: width + 2 }} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )
+    case 'connector':
+      return (
+        <div className="panel tool-options" role="group" aria-label="Connector options">
+          <div className="segmented" role="group" aria-label="Line style">
+            {CONNECTOR_STYLES.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                aria-label={label}
+                title={label}
+                aria-pressed={options.connectorStyle === value}
+                onClick={() => onOptionsChange({ connectorStyle: value })}
+              >
+                <Icon size={16} strokeWidth={1.75} />
               </button>
             ))}
           </div>

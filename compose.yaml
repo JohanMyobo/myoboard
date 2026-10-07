@@ -1,0 +1,19 @@
+# docker compose up -d   then open http://localhost:3000
+# Settings (PUBLIC_URL, sign-in with your company's accounts) come from a
+# .env file next to this one: copy .env.example. Put HTTPS in front (a
+# reverse proxy) before sharing the server.
+services:
+  myoboard:
+    build: .
+    image: myoboard
+    ports:
+      - "3000:3000"
+    volumes:
+      - myoboard-data:/data
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
+
+volumes:
+  myoboard-data:

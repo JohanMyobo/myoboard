@@ -1,7 +1,8 @@
-import { BringToFront, Copy, Trash2 } from 'lucide-react'
+import { BringToFront, Copy, CornerDownRight, Minus, MoveHorizontal, MoveRight, Spline, Trash2, Type } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { Board } from '../model/board'
 import { PEN_COLORS, SECTION_COLORS, SHAPE_COLORS, STICKY_COLORS } from '../model/palette'
-import type { BoardObject, ShapeKind } from '../model/types'
+import type { ArrowHeads, BoardObject, ConnectorObject, ConnectorStyle, ObjectPatch, ShapeKind } from '../model/types'
 import { ShapeKindPicker, Swatches } from './Swatches'
 
 interface ContextBarProps {
@@ -11,6 +12,8 @@ interface ContextBarProps {
   position: { x: number; y: number }
   onDuplicate(): void
   onDelete(): void
+  /** Starts editing an object's text (a connector's label). */
+  onEditText(id: string): void
 }
 
 const PALETTES = {
@@ -18,35 +21,89 @@ const PALETTES = {
   shape: SHAPE_COLORS,
   section: SECTION_COLORS,
   pen: PEN_COLORS,
+  connector: PEN_COLORS,
 } as const
 
-/** Actions for the current selection: colour, shape, order, duplicate, delete. */
-export function ContextBar({ board, selected, position, onDuplicate, onDelete }: ContextBarProps) {
+export const CONNECTOR_STYLES: { value: ConnectorStyle; label: string; icon: LucideIcon }[] = [
+  { value: 'straight', label: 'Straight', icon: Minus },
+  { value: 'elbow', label: 'Elbow', icon: CornerDownRight },
+  { value: 'curved', label: 'Curved', icon: Spline },
+]
+
+const ARROWS: { value: ArrowHeads; label: string; icon: LucideIcon }[] = [
+  { value: 'none', label: 'No arrowhead', icon: Minus },
+  { value: 'end', label: 'Arrow at the end', icon: MoveRight },
+  { value: 'both', label: 'Arrows at both ends', icon: MoveHorizontal },
+]
+
+function Choice<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string
+  options: { value: T; label: string; icon: LucideIcon }[]
+  value: T | null
+  onChange(value: T): void
+}) {
+  return (
+    <div className="segmented" role="group" aria-label={label}>
+      {options.map(({ value: v, label: l, icon: Icon }) => (
+        <button key={v} type="button" aria-label={l} title={l} aria-pressed={value === v} onClick={() => onChange(v)}>
+          <Icon size={16} strokeWidth={1.75} />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+const same = <T,>(values: T[]): T | null => (new Set(values).size === 1 ? values[0] : null)
+
+/** Actions for the current selection: colour, shape or line style, order, duplicate, delete. */
+export function ContextBar({ board, selected, position, onDuplicate, onDelete, onEditText }: ContextBarProps) {
   if (selected.length === 0) return null
   const types = new Set(selected.map((obj) => obj.type))
   const onlyType = types.size === 1 ? selected[0].type : null
   const palette = onlyType && onlyType in PALETTES ? PALETTES[onlyType as keyof typeof PALETTES] : null
-  const colors = new Set(selected.map((obj) => ('color' in obj ? obj.color : '')))
-  const currentColor = colors.size === 1 ? [...colors][0] : null
+  const currentColor = same(selected.map((obj) => ('color' in obj ? obj.color : '')))
   const shapes = selected.filter((obj) => obj.type === 'shape')
-  const kinds = new Set(shapes.map((obj) => obj.kind))
+  const connectors = selected.filter((obj): obj is ConnectorObject => obj.type === 'connector')
   const ids = selected.map((obj) => obj.id)
 
-  const recolor = (color: string) => {
+  const change = (patches: { id: string; patch: ObjectPatch }[]) => {
     board.checkpoint()
-    board.updateMany(ids.map((id) => ({ id, patch: { color } })))
-    board.checkpoint()
-  }
-  const reshape = (kind: ShapeKind) => {
-    board.checkpoint()
-    board.updateMany(shapes.map((obj) => ({ id: obj.id, patch: { kind } })))
+    board.updateMany(patches)
     board.checkpoint()
   }
+  const recolor = (color: string) => change(ids.map((id) => ({ id, patch: { color } })))
+  const reshape = (kind: ShapeKind) => change(shapes.map((obj) => ({ id: obj.id, patch: { kind } })))
 
   return (
     <div className="panel context-bar" role="toolbar" aria-label="Selection" style={{ left: position.x, top: position.y }}>
       <span className="context-count">{selected.length === 1 ? labelFor(selected[0]) : `${selected.length} selected`}</span>
-      {onlyType === 'shape' && <ShapeKindPicker value={kinds.size === 1 ? [...kinds][0] : null} onChange={reshape} />}
+      {onlyType === 'shape' && <ShapeKindPicker compact value={same(shapes.map((obj) => obj.kind))} onChange={reshape} />}
+      {onlyType === 'connector' && (
+        <>
+          <Choice
+            label="Line style"
+            options={CONNECTOR_STYLES}
+            value={same(connectors.map((c) => c.style ?? 'straight'))}
+            onChange={(style) => change(connectors.map((c) => ({ id: c.id, patch: { style } })))}
+          />
+          <Choice
+            label="Arrowheads"
+            options={ARROWS}
+            value={same(connectors.map((c) => c.arrows ?? 'end'))}
+            onChange={(arrows) => change(connectors.map((c) => ({ id: c.id, patch: { arrows } })))}
+          />
+          {connectors.length === 1 && (
+            <button type="button" className="icon-button" aria-label="Edit label" title="Label (Enter)" onClick={() => onEditText(connectors[0].id)}>
+              <Type size={18} strokeWidth={1.75} />
+            </button>
+          )}
+        </>
+      )}
       {palette && <Swatches colors={palette} value={currentColor} onChange={recolor} />}
       <div className="context-actions">
         <button type="button" className="icon-button" aria-label="Bring to front" title="Bring to front" onClick={() => board.bringToFront(ids)}>
@@ -79,5 +136,7 @@ function labelFor(obj: BoardObject): string {
       return 'Section'
     case 'stamp':
       return 'Stamp'
+    case 'image':
+      return 'Image'
   }
 }

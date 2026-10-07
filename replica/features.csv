@@ -2,8 +2,8 @@ feature,area,priority,original,clone,notes
 Infinite canvas with pan and zoom,canvas,must,yes,yes,
 Sticky notes in several colours,sticky notes,must,yes,yes,8 colours; text shrinks to fit; author shown
 Edit text directly on the canvas,editing,must,yes,yes,
-Shapes with a label,shapes,must,yes,partial,rectangle ellipse and diamond only
-Connectors attached to objects,connectors,must,yes,partial,straight with an arrowhead; no elbows curves or labels
+Shapes with a label,shapes,must,yes,yes,10 shapes: rectangle pill ellipse diamond triangle hexagon parallelogram arrow star cylinder
+Connectors attached to objects,connectors,must,yes,yes,straight elbow or curved; labels; arrowheads at none one or both ends; attach to each shape's real outline
 Select move and resize objects,editing,must,yes,yes,
 Multi-select with Shift and a selection box,editing,must,yes,yes,
 Undo and redo,editing,must,yes,yes,only your own edits as in the original
@@ -11,7 +11,8 @@ Real-time multiplayer editing,collaboration,must,yes,yes,property-level merge
 Live cursors with names,collaboration,must,yes,yes,
 Share a board with a link,sharing,must,yes,yes,
 Autosave,persistence,must,yes,yes,server file plus browser copy
-Sign-in and per-board permissions,accounts,must,yes,no,anyone with the link can edit
+Sign-in and per-board permissions,accounts,must,yes,yes,company accounts through OpenID Connect (Google or Microsoft) or name and email locally; owner editor viewer; link access
+Board list with recent owned and shared boards,accounts,should,yes,yes,search and filters; owners delete boards
 Sections that group content,sections,should,yes,yes,content moves with the section
 Pen drawing,drawing,should,yes,yes,3 widths and 6 colours
 Reaction stamps,reactions,should,yes,yes,8 emoji
@@ -20,13 +21,13 @@ Duplicate delete and bring to front,editing,should,yes,yes,
 Change colour and shape from the selection,editing,should,yes,yes,
 See who is on the board,collaboration,should,yes,yes,
 See what others have selected,collaboration,should,yes,yes,
-Export the board as an image,export,should,yes,partial,PNG only
-Comments,comments,should,yes,no,
-Images and file uploads,media,should,yes,no,
-Copy and paste,editing,should,yes,partial,duplicate only
-Templates,templates,should,yes,no,
-Voting sessions,facilitation,should,yes,no,
-Timer,facilitation,should,yes,no,
+Export the board as an image,export,should,yes,yes,PNG JPG or PDF; the whole board or the selection
+Comments,comments,should,yes,yes,pinned to the board or to an object; threads with replies; resolve; a panel of open and resolved threads
+Images and file uploads,media,should,yes,partial,images (PNG JPEG GIF WebP) from a button or by dropping or pasting; no other files
+Copy and paste,editing,should,yes,yes,within and between boards through the system clipboard (images copied over); pasted lines become sticky notes
+Templates,templates,should,yes,yes,retrospective brainstorm and kanban built in; save a board or a selection as a team template
+Voting sessions,facilitation,should,yes,yes,votes per person; hidden until the vote ends; ranked results
+Timer,facilitation,should,yes,yes,shared countdown on the server's clock; pause add time stop; chime
 Rich text (bold lists sizes),text,should,yes,no,
 Tables,tables,could,yes,no,
 Cursor chat,collaboration,could,yes,no,

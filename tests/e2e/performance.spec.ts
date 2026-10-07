@@ -47,17 +47,24 @@ test('stays fluid with 500 sticky notes', async ({ page }, info) => {
   await page.getByRole('button', { name: 'Zoom to fit' }).click()
   const overview = await measurePan(page)
 
+  // Just above the zoom where text and shadows are skipped: about 300 notes
+  // drawn in full, the worst case.
+  await page.evaluate(() => window.__myoboard!.setCamera({ x: 0, y: 0, scale: 0.26 }))
+  const crowded = await measurePan(page)
+
   // Working zoom: 100%, text drawn, the rest of the board off screen.
   await page.getByRole('button', { name: 'Reset zoom to 100%' }).click()
   const working = await measurePan(page)
 
   const summary =
     `500 stickies, ms per frame while panning — overview: median ${overview.median.toFixed(1)}, p95 ${overview.p95.toFixed(1)}; ` +
+    `26% zoom: median ${crowded.median.toFixed(1)}, p95 ${crowded.p95.toFixed(1)}; ` +
     `100% zoom: median ${working.median.toFixed(1)}, p95 ${working.p95.toFixed(1)}`
   info.annotations.push({ type: 'performance', description: summary })
   console.log(summary)
   // Headless Chromium draws in software; a real browser with a GPU does better.
   // 34 ms is two frames at 60 Hz, i.e. at least 30 frames per second.
   expect(overview.median).toBeLessThan(34)
+  expect(crowded.median).toBeLessThan(34)
   expect(working.median).toBeLessThan(34)
 })

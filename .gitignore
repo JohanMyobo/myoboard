@@ -8,6 +8,11 @@ playwright-report/
 *.log
 .DS_Store
 
+# Local settings and secrets (see .env.example)
+.env
+.env.*
+!.env.example
+
 # Personal Claude Code settings and notes
 .claude/settings.local.json
 CLAUDE.local.md

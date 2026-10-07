@@ -2,27 +2,29 @@
 
 Open-source (MIT), self-hostable collaborative whiteboard: sticky notes,
 shapes, text, pen, connectors, sections, reaction stamps, live cursors,
-real-time sync and PNG export. TypeScript end to end: a React + Konva client
-and one Node server that serves the app and syncs boards over WebSockets with
-Yjs. No database, account, API key or `.env` file: boards are files in
-`data/`.
+real-time sync and PNG export, behind sign-in with per-board permissions.
+TypeScript end to end: a React + Konva client and one Node server that
+serves the app, a JSON API and sign-in, and syncs boards over WebSockets
+with Yjs. Boards are Yjs files in `data/`; accounts, sessions, permissions
+and team templates are in `data/myoboard.db` (Node's built-in
+`node:sqlite`). No external service, API key or `.env` file is needed.
 
-Status: week-1 MVP, done and tested ("Not built yet" in README.md lists the
-gaps). The repository is public: anyone can read everything committed,
+Status: v2 done ("Not built yet" in README.md lists the gaps). The repository is public: anyone can read everything committed,
 history and commit metadata included. Never commit secrets, credentials,
 internal hostnames or URLs, other people's names, or personal data, and
 don't publish packages or releases unless the user asks.
 
 ## Get it running
 
-1. `node --version` must be 22.12+ or 24 (`.nvmrc` pins 22); the
-   dependencies don't support 22.0–22.11, 23 or 25. If it doesn't match,
+1. `node --version` must be 22.13+, 24 or 26+ (`.nvmrc` pins 22); the
+   dependencies and `node:sqlite` don't support 22.0–22.12, 23 or 25. If it doesn't match,
    stop and ask the user to switch (`nvm use`, `fnm use` or the Node
    installer) rather than working around it.
 2. `npm ci`
 3. `npm start -- --host 127.0.0.1`, as a background task: it builds, then
-   serves the app and sync on http://localhost:3000. Opening `/` creates a
-   board at `/b/<id>`.
+   serves the app and sync on http://localhost:3000. With no sign-in brick
+   set up, sign-in asks for a name and an email (any will do); `/` then
+   lists your boards and boards open at `/b/<id>`.
 4. `npm run health` waits until the server answers on `/healthz` (add
    `-- --port <n>` if you changed the port). Use it rather than curl: it is
    pre-approved and behaves the same on every OS.
@@ -47,7 +49,18 @@ experiments at a scratch folder with `--data-dir`.
 | `npm run check` | Typecheck + unit tests |
 
 Server options: `--port` / `PORT` (3000), `--host` / `HOST` (0.0.0.0),
-`--data-dir` / `DATA_DIR` (`./data`); a flag wins over its variable. In npm
+`--data-dir` / `DATA_DIR` (`./data`), `--public-url` / `PUBLIC_URL`; a flag
+wins over its variable, and variables can sit in a `.env` file where the
+server starts (`.env.example`; git- and docker-ignored: never commit it,
+never print the secret it holds). `npm run dev` and the end-to-end tests
+pass `--no-env-file`, so they keep name-and-email sign-in whatever `.env`
+says; `npm start` and Docker use it. Sign-in bricks, each optional and
+combinable (README.md, "Sign-in"): Google (`GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, optional `GOOGLE_ALLOWED_DOMAINS`), any OpenID
+Connect provider (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`,
+optional `OIDC_ALLOWED_DOMAINS`, `OIDC_PROVIDER_NAME`), and name and email
+(`LOCAL_SIGN_IN`, on by default only without a provider). A brick filled in
+halfway stops the server with a message naming what is missing. In npm
 scripts, put flags after `--`.
 
 One test at a time: `npx vitest run src/model`,
@@ -73,28 +86,46 @@ suggest the user sets it once in `.claude/settings.local.json` (personal,
 git-ignored): `{ "env": { "PW_CHANNEL": "msedge" } }`.
 
 The performance test fails if panning across 500 sticky notes takes a median
-of 34 ms or more per frame; headless Chromium without a GPU measures about
-17 ms.
+of 34 ms or more per frame, zoomed to fit, at 26% or at 100%; headless
+Chromium without a GPU and Chrome on macOS both measure about 17 ms.
 
 ## Map
 
 ```text
 src/
-  App.tsx            `/` creates a board, `/b/<id>` opens one
-  BoardScreen.tsx    board page: state, shortcuts, camera, export, debug handle
-  model/             no React: types, Board (Yjs), geometry, palette
-  sync/              session (y-websocket + IndexedDB), identity (random name)
+  App.tsx            routes: /login, / (your boards), /b/<id>; loads who is signed in
+  router.ts          pushState navigation without a library
+  api.ts             typed client for the JSON API
+  BoardScreen.tsx    board page: loads your role, then state, shortcuts, camera, export
+  screens/           LoginScreen, HomeScreen (board list), MessageScreen
+  clipboard.ts       copy and paste payloads: what a copy takes, pasted text to notes
+  templates.ts       built-in templates (retrospective, brainstorm, kanban)
+  model/             no React: types, Board (Yjs), geometry, shapes (outlines,
+                     label boxes), comments (threads), facilitation (timer,
+                     votes), palette
+  sync/              session (y-websocket + IndexedDB), identity (your account),
+                     clock (offset to the server's clock, for timers)
   canvas/            Konva: Canvas (tools, drafts, drag, resize), nodes, camera,
-                     TextEditor, PeerCursors, exportPng
-  ui/                Toolbar, ContextBar, TopBar, ZoomControls, Swatches
+                     TextEditor, PeerCursors, exportBoard (PNG, JPG, PDF), pdf
+  ui/                Toolbar, ContextBar, TopBar, ZoomControls, Swatches,
+                     ShareDialog, Modal, MenuButton, UserMenu, CommentLayer,
+                     CommentsPanel, Timer, Voting, TemplatesDialog
   hooks.ts, tools.ts
 server/
-  index.ts           CLI: options, listen, save every board on exit
-  app.ts             HTTP (built app, /healthz) + WebSocket upgrade on /ws/<board>
-  rooms.ts           one Room per board: y-websocket protocol, presence, debounced saves
+  index.ts           CLI: options and OIDC settings, listen, save every board on exit
+  app.ts             HTTP routing + WebSocket upgrade on /ws/<board> (checks the role)
+  auth.ts            sessions, name-and-email sign-in, OpenID Connect (openid-client)
+  api.ts             /api (boards, members, link access, templates) and /media (images)
+  store.ts           SQLite: users, sessions, boards, members, visits, templates
+  assets.ts          board images on disk, named by content, sniffed by magic bytes
+  rooms.ts           one Room per board: y-websocket protocol, read-only viewers,
+                     presence, debounced saves
+  http.ts            JSON, cookies, same-origin check
   health.ts          `npm run health`: wait until a server answers
+  test-helpers.ts    start an app, sign in, sync clients with a cookie
 tests/e2e/           Playwright specs and helpers
 replica/             feature matrix, parity score, recon notes
+Dockerfile, compose.yaml   the container image and how to run it
 ```
 
 ## Document model
@@ -102,9 +133,25 @@ replica/             feature matrix, parity score, recon notes
 - A board is a Yjs doc. `objects` maps each id to a Y.Map of properties, so
   concurrent edits merge property by property (last writer wins); `meta`
   holds the title.
-- Object types (`src/model/types.ts`): sticky, shape (rect, ellipse,
-  diamond), text, pen, connector (each end attached to an object or free),
-  section, stamp.
+- Object types (`src/model/types.ts`): sticky, shape (10 kinds, outlines in
+  `model/shapes.ts`), text, pen, connector (each end attached to an object
+  or free; `style` straight, elbow or curved, `arrows`, `label`), section,
+  stamp, image (`src` is `/media/<board>/<file>`).
+- Optional properties are absent on objects from older boards: read them
+  with a default (`conn.style ?? 'straight'`, `conn.arrows ?? 'end'`).
+- Connectors are drawn from `connectorRoute` (`geometry.ts`), which also
+  gives their bounds and label position; `shapeOutline` drives the canvas,
+  connector attachment and the toolbar icons, so the three agree.
+- Copies go in through `Board.insertCopies` (duplicate, paste, templates):
+  one transaction, so one undo step, with connectors remapped to the
+  copies.
+- The same Yjs doc holds `comments` (`model/comments.ts`: threads, each a
+  Y.Map with a Y.Array of messages, optionally pinned to an object) and
+  `facilitation` (`model/facilitation.ts`: the timer and the vote, with one
+  ballot key per voter so nobody overwrites anyone). Neither is undoable:
+  `Board`'s UndoManager only tracks `objects` and `meta`.
+- Timers store absolute times on the server's clock: always use
+  `serverNow()` from `sync/clock.ts`, never `Date.now()`.
 - Back-to-front order is a fractional `index` string
   (`fractional-indexing`); ties break on id.
 - Change a board only through `Board` methods (`create`, `update`,
@@ -117,6 +164,34 @@ replica/             feature matrix, parity score, recon notes
   and on the server (`isValidRoomName`) because they become file names; keep
   the two in step.
 
+## Accounts and permissions
+
+- A user is an email address (lowercased) with a name and a colour. The
+  same email is the same account, whichever way it signs in. Identity
+  providers (`AuthOptions.providers`, built from the environment in
+  `index.ts`) vouch for the email; name-and-email sign-in (`localSignIn`)
+  lets anyone type any address. All providers share `/auth/callback`: the
+  pending login remembers which one was picked. With Google and allowed
+  domains, the account must also be managed by one of them (`hd` claim): a
+  personal Google account can carry a company address.
+- A board belongs to its creator (owner). Invitations are by email with a
+  role, editor or viewer, and work before the person ever signs in. Link
+  access (`none`, `view`, `edit`, default `edit`) is what anyone signed in
+  with the link gets. Someone's role is the highest of these
+  (`Store.roleFor`).
+- The server enforces roles: API routes check them, the WebSocket upgrade
+  refuses people without access, and a viewer's connection is read-only
+  (`rooms.ts` ignores its sync step 2 and updates but sends it everything).
+  After a permission change, `refreshAccess` closes the connections whose
+  role changed with code 4000 (`ACCESS_CHANGED`); the client reconnects and
+  reloads its role.
+- A board must exist in the database before its WebSocket opens: create it
+  with `POST /api/boards`. A `.ybin` file without a row (boards from before
+  sign-in existed) is given to the first person who opens it.
+- The title lives in the Yjs doc (`meta.title`); the server copies it into
+  the database for the board list, and seeds the doc with the title a board
+  was created with.
+
 ## Gotchas
 
 - Stay on Yjs 13. Don't add `@y/websocket-server`: it pulls a Yjs 14
@@ -124,9 +199,11 @@ replica/             feature matrix, parity score, recon notes
   the protocol with `y-protocols` instead.
 - 500 objects pan at 60 fps because: nodes are `memo` components that all
   receive one stable `handlers` object (no inline callbacks or fresh objects
-  as props); only objects near the viewport are drawn (`drawRegion`); text is
-  skipped below 25% zoom (`LOW_DETAIL_SCALE`). PNG export sets `fullRender`
-  to draw everything: keep it working if you touch culling.
+  as props); only objects near the viewport are drawn (`drawRegion`); text and
+  shadows are skipped below 25% zoom (`LOW_DETAIL_SCALE`); a sticky note's
+  shadow is one pre-blurred bitmap, never Konva's `shadowBlur`, which costs
+  about 100 ms a frame with a few hundred notes in Chrome on macOS. PNG export
+  sets `fullRender` to draw everything: keep it working if you touch culling.
 - Sticky notes, text and stamps are created on pointer release and their
   editor is focused synchronously. Creating them on pointer down loses the
   first typed character.
@@ -140,6 +217,34 @@ replica/             feature matrix, parity score, recon notes
   `npm.cmd` and `npx.cmd`.
 - "Port 3000 is already in use" usually means an earlier server is still
   running: stop it, or pass `--port`.
+- In `npm run dev`, Vite's proxy must keep the browser's Host header
+  (`changeOrigin: false` in `vite.config.ts`): the server refuses changes
+  whose Origin does not match the Host it sees, and builds the OIDC
+  redirect from it. A bare URL as a proxy target turns `changeOrigin` on.
+- `package.json` overrides `shell-quote` to a patched version: concurrently
+  (used by `npm run dev`) pins a vulnerable one. Drop the override once
+  concurrently ships a fixed release (`npm audit` should stay at zero).
+- Vite serves the app's own bundles under `/assets/`, so board images live
+  under `/media/<board>/<file>` (on disk in `data/media/`). Don't route
+  anything else under `/assets/`.
+- Copy, cut and paste listen to the document's clipboard events (not
+  keydown), skip inputs and textareas, and write a private
+  `application/x-myoboard` format next to plain text. An image belongs to
+  its board: pasting it into another board copies the file there through
+  `POST /api/boards/<id>/assets/import`.
+- Images load once per address (`imageEntry` in `nodes.tsx`), whatever the
+  number of objects showing them.
+- A team template's images are copied to the pseudo-board `_t_<template
+  id>` (`/media/_t_<id>/...`), readable by anyone signed in; board ids
+  starting with `_` are therefore refused.
+- While a vote runs, the canvas turns clicks on objects into votes
+  (`onVote`): no selection, dragging, resizing or double-click editing.
+- Exports render through Konva (`renderBoard`): comment pins and vote
+  badges are HTML overlays, so they never end up in an export.
+- End-to-end tests must sign in: `openBoard` in `tests/e2e/helpers.ts` signs
+  the page's context in (local mode) and creates the board through the API.
+  Server tests use `server/test-helpers.ts` the same way.
+- Node prints an ExperimentalWarning for `node:sqlite` on 22 and 24: harmless.
 
 ## Conventions
 
@@ -185,13 +290,20 @@ information only. Keep it that way:
 
 ## Security
 
-No sign-in or permissions yet: anyone who has a board's link can edit it.
-Don't expose a server beyond a trusted network. WebSocket messages are capped
-at 10 MB.
+- Sessions: a random token in an `HttpOnly`, `SameSite=Lax` cookie, stored
+  as a SHA-256 hash, 30 days. Requests that change something and WebSocket
+  upgrades must come from the app's origin (`sameOrigin` in `http.ts`).
+- Local mode lets anyone sign in as anyone: never expose it beyond a
+  trusted machine; the server warns when it listens on the network that way.
+- Images: PNG, JPEG, GIF and WebP only, sniffed from their bytes (no SVG),
+  10 MB each, served only to people with access, with `nosniff`.
+- WebSocket messages are capped at 10 MB.
 
 ## Next
 
-v2 candidates, in order: sign-in and per-board permissions, comments, images,
-copy and paste, templates, elbow connectors with labels (see
-`replica/parity.md`). The maintainer sets the scope: check with the user
+v2 is done: access (sign-in, permissions, board list, CI), content
+(images, copy and paste, 10 shapes, connectors with labels) and workshops
+(comments, templates, timer, voting, exports, Docker image); parity 86/100.
+Candidates next, see `replica/parity.md`: rich text, files other than
+images, pinch zoom. The maintainer sets the scope: check with the user
 before starting a large feature.
