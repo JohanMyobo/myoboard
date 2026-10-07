@@ -1,5 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import * as Y from 'yjs'
 import * as syncProtocol from 'y-protocols/sync'
 import * as awarenessProtocol from 'y-protocols/awareness'
@@ -7,6 +5,8 @@ import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { WebSocket } from 'ws'
 import type { RawData } from 'ws'
+import { FileStore } from './store'
+import type { BoardStore } from './store'
 
 // Message types of the y-websocket protocol, which the browser client speaks.
 const MESSAGE_SYNC = 0
@@ -20,7 +20,9 @@ export const isValidRoomName = (name: string): boolean => ROOM_NAME.test(name)
 
 export interface RoomManagerOptions {
   /** Where boards are saved; null keeps everything in memory. */
-  dataDir: string | null
+  dataDir?: string | null
+  /** A board store to use instead of `dataDir` (e.g. cloud blobs when there's no local disk). */
+  store?: BoardStore | null
   /** Save this long after the last edit... */
   saveDelayMs?: number
   /** ...but never later than this after the first unsaved edit. */
@@ -53,23 +55,31 @@ class Room {
   private firstUnsavedAt = 0
   private dirty = false
   private closed = false
+  /** Resolves once the board's saved bytes (if any) have been applied. */
+  private readonly loaded: Promise<void>
 
   constructor(
-    private readonly file: string | null,
+    private readonly name: string,
+    private readonly store: BoardStore | null,
     private readonly saveDelayMs: number,
     private readonly maxSaveDelayMs: number,
   ) {
-    if (file && fs.existsSync(file)) Y.applyUpdate(this.doc, fs.readFileSync(file))
+    this.loaded = store
+      ? store.load(name).then((data) => {
+          if (data) Y.applyUpdate(this.doc, data)
+        })
+      : Promise.resolve()
     this.awareness.setLocalState(null) // the server has no cursor of its own
     this.doc.on('update', this.handleUpdate)
     this.awareness.on('update', this.handleAwarenessUpdate)
   }
 
   get persistent(): boolean {
-    return this.file !== null
+    return this.store !== null
   }
 
-  join(conn: WebSocket): void {
+  async join(conn: WebSocket): Promise<void> {
+    await this.loaded
     this.conns.set(conn, new Set())
     conn.on('message', (data) => this.handleMessage(conn, toBytes(data)))
 
@@ -95,29 +105,30 @@ class Room {
     }
   }
 
-  save(): void {
+  async save(): Promise<void> {
     if (this.saveTimer) clearTimeout(this.saveTimer)
     this.saveTimer = null
     this.firstUnsavedAt = 0
-    if (!this.file || !this.dirty) return
+    if (!this.store || !this.dirty) return
     this.dirty = false
-    const tmp = `${this.file}.${process.pid}.tmp`
+    // Snapshot the doc synchronously: it must not change (or be destroyed)
+    // while the save below is in flight.
+    const data = Y.encodeStateAsUpdate(this.doc)
     try {
-      fs.mkdirSync(path.dirname(this.file), { recursive: true })
-      fs.writeFileSync(tmp, Y.encodeStateAsUpdate(this.doc))
-      fs.renameSync(tmp, this.file)
+      await this.store.save(this.name, data)
     } catch (err) {
-      // A failed write (disk full, data folder removed, file briefly locked by
-      // an antivirus on Windows) must not take the server down: keep the edits
-      // and try again. A closed room gives up; its clients still hold the edits.
-      console.error(`[sync] could not save ${this.file}:`, err)
+      // A failed write (disk full, data folder removed, a blob store hiccup)
+      // must not take the server down: keep the edits and try again. A
+      // closed room gives up; its clients still hold the edits.
+      console.error(`[sync] could not save board "${this.name}":`, err)
+      this.dirty = true
       if (!this.closed) this.scheduleSave()
     }
   }
 
-  destroy(): void {
+  async destroy(): Promise<void> {
     this.closed = true
-    this.save()
+    await this.save()
     this.awareness.destroy()
     this.doc.destroy()
   }
@@ -166,7 +177,7 @@ class Room {
   }
 
   private scheduleSave(): void {
-    if (!this.file) return
+    if (!this.store) return
     this.dirty = true
     const now = Date.now()
     if (!this.firstUnsavedAt) this.firstUnsavedAt = now
@@ -182,13 +193,14 @@ class Room {
  */
 export class RoomManager {
   private readonly rooms = new Map<string, Room>()
+  private readonly store: BoardStore | null
   private readonly saveDelayMs: number
   private readonly maxSaveDelayMs: number
 
-  constructor(private readonly options: RoomManagerOptions) {
+  constructor(options: RoomManagerOptions) {
     this.saveDelayMs = options.saveDelayMs ?? 1_000
     this.maxSaveDelayMs = options.maxSaveDelayMs ?? 5_000
-    if (options.dataDir) fs.mkdirSync(options.dataDir, { recursive: true })
+    this.store = options.store ?? (options.dataDir ? new FileStore(options.dataDir) : null)
   }
 
   get openRooms(): number {
@@ -202,11 +214,10 @@ export class RoomManager {
     }
     let room = this.rooms.get(name)
     if (!room) {
-      const file = this.options.dataDir ? path.join(this.options.dataDir, `${name}.ybin`) : null
-      room = new Room(file, this.saveDelayMs, this.maxSaveDelayMs)
+      room = new Room(name, this.store, this.saveDelayMs, this.maxSaveDelayMs)
       this.rooms.set(name, room)
     }
-    room.join(conn)
+    void room.join(conn)
 
     let alive = true
     conn.on('pong', () => {
@@ -227,13 +238,13 @@ export class RoomManager {
       joined.leave(conn)
       if (joined.conns.size === 0 && joined.persistent && this.rooms.get(name) === joined) {
         this.rooms.delete(name)
-        joined.destroy()
+        void joined.destroy()
       }
     })
   }
 
-  /** Writes every open board to disk now (used on shutdown). */
-  flushAll(): void {
-    for (const room of this.rooms.values()) room.save()
+  /** Saves every open board now, and waits for it (used on shutdown). */
+  async flushAll(): Promise<void> {
+    await Promise.all([...this.rooms.values()].map((room) => room.save()))
   }
 }

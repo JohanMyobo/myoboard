@@ -38,8 +38,8 @@ server.listen(port, host, () => {
   console.log(`Myoboard ${serveApp ? 'app + sync' : 'sync'} server on http://${where}:${port} (boards saved in ${dataDir})`)
 })
 
-const shutdown = () => {
-  rooms.flushAll()
+const shutdown = async () => {
+  await rooms.flushAll()
   process.exit(0)
 }
 process.on('SIGINT', shutdown)
