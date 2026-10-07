@@ -13,14 +13,20 @@ time between everyone on the same board.
   10 shapes with labels (rectangle, pill, ellipse, diamond, triangle,
   hexagon, parallelogram, arrow, star, cylinder), free text, pen strokes,
   images, sections that carry their content when moved, reaction stamps.
-- **Connectors**: attached to objects (they meet each shape's real outline),
-  straight, elbow or curved, with a label and arrowheads at either end.
+- **Connectors**: attached to objects (they meet each shape's real outline,
+  or snap to the anchor point in the middle of a side as you come close),
+  straight, elbow or curved, with a label and arrowheads at either end; drag
+  either end of a selected connector to attach it elsewhere.
 - **Images**: add PNG, JPEG, GIF or WebP pictures from the toolbar, by
   dropping files on the board or by pasting a screenshot.
 - **Editing**: click, Shift-click or drag a box to select; move, resize,
   recolour, duplicate, bring to front, delete; undo and redo (your own edits
   only); copy, cut and paste within a board, between boards and from other
   apps (a pasted list becomes one sticky note per line).
+- **Layout**: guides appear and edges snap into line with nearby objects
+  while you move or resize; align and distribute a selection from its
+  toolbar; resize several objects at once from large handles, with the size
+  shown as you go.
 - **Real time**: everyone on the board sees edits as they happen (text
   included), named cursors, who is here, and what others have selected.
 - **Resilient**: every board is saved on the server and kept in the browser
@@ -167,6 +173,8 @@ variables.
 | Ctrl/⌘ C / X / V           | Copy / cut / paste                |
 | Ctrl/⌘ D                   | Duplicate                         |
 | Ctrl/⌘ A                   | Select all                        |
+| Alt while moving           | Move without snapping             |
+| Shift / Alt while resizing | Keep proportions / resize from the centre |
 | Ctrl/⌘ + / − / 0, Shift 1  | Zoom in / out / 100% / fit        |
 
 ## How it works

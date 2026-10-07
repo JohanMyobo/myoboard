@@ -66,8 +66,15 @@ export interface PenObject extends BaseObject {
   width: number
 }
 
-/** A connector end is either attached to an object or left at a free point. */
-export type Endpoint = { id: string } | { x: number; y: number }
+/** A side of an object that a connector end can be pinned to. */
+export type AnchorSide = 'top' | 'right' | 'bottom' | 'left'
+
+/**
+ * A connector end is either attached to an object or left at a free point.
+ * An attached end without a side follows the object round (it leaves from
+ * whichever side faces the other end); with a side, it stays on that side.
+ */
+export type Endpoint = { id: string; side?: AnchorSide } | { x: number; y: number }
 
 export type ConnectorStyle = 'straight' | 'elbow' | 'curved'
 export type ArrowHeads = 'end' | 'both' | 'none'

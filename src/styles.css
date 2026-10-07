@@ -410,6 +410,27 @@ kbd {
   grid-auto-flow: column;
 }
 
+.context-bar .menu-popover {
+  min-width: 0;
+  padding: 8px;
+}
+
+.align-menu {
+  display: grid;
+  gap: 8px;
+}
+
+.align-grid {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 2px;
+}
+
+.align-grid + .align-grid {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
 .context-count {
   color: var(--ink-soft);
   font-weight: 600;
@@ -570,6 +591,12 @@ kbd {
 
   .context-bar .swatches {
     display: none;
+  }
+
+  /* The bar sits at the bottom here: its menu opens upwards. */
+  .context-bar .menu-popover {
+    top: auto;
+    bottom: calc(100% + 10px);
   }
 }
 

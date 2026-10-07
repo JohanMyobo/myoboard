@@ -1,6 +1,6 @@
-## Parity: 86.0 / 100
+## Parity: 86.9 / 100
 
-features 86.0  (39 counted, must-haves 13 of 13 done)
+features 86.9  (42 counted, must-haves 13 of 13 done)
 
 ## By area, weakest first
 - tables                         0.0  (1 features)
@@ -13,9 +13,9 @@ features 86.0  (39 counted, must-haves 13 of 13 done)
 - collaboration                 76.9  (7 features)
 - canvas                       100.0  (1 features)
 - sticky notes                 100.0  (1 features)
-- editing                      100.0  (7 features)
+- editing                      100.0  (9 features)
 - shapes                       100.0  (1 features)
-- connectors                   100.0  (1 features)
+- connectors                   100.0  (2 features)
 - sharing                      100.0  (1 features)
 - persistence                  100.0  (1 features)
 - accounts                     100.0  (2 features)

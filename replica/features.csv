@@ -4,7 +4,7 @@ Sticky notes in several colours,sticky notes,must,yes,yes,8 colours; text shrink
 Edit text directly on the canvas,editing,must,yes,yes,
 Shapes with a label,shapes,must,yes,yes,10 shapes: rectangle pill ellipse diamond triangle hexagon parallelogram arrow star cylinder
 Connectors attached to objects,connectors,must,yes,yes,straight elbow or curved; labels; arrowheads at none one or both ends; attach to each shape's real outline
-Select move and resize objects,editing,must,yes,yes,
+Select move and resize objects,editing,must,yes,yes,large handles and side bars; several objects at once; size shown while resizing; Shift keeps proportions and Alt resizes from the centre
 Multi-select with Shift and a selection box,editing,must,yes,yes,
 Undo and redo,editing,must,yes,yes,only your own edits as in the original
 Real-time multiplayer editing,collaboration,must,yes,yes,property-level merge
@@ -18,6 +18,9 @@ Pen drawing,drawing,should,yes,yes,3 widths and 6 colours
 Reaction stamps,reactions,should,yes,yes,8 emoji
 Free text,text,should,yes,yes,
 Duplicate delete and bring to front,editing,should,yes,yes,
+Alignment guides and snapping,editing,should,yes,yes,edges and centres snap to nearby objects while moving or resizing; Alt moves freely
+Align and distribute a selection,editing,should,yes,yes,six alignments and even spacing across or down; sections carry their content
+Connector anchor points,connectors,should,yes,yes,ends snap to the middle of each side within 14 px; drag an end to attach it elsewhere; elbows and curves leave the side they start from
 Change colour and shape from the selection,editing,should,yes,yes,
 See who is on the board,collaboration,should,yes,yes,
 See what others have selected,collaboration,should,yes,yes,

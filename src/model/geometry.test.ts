@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  anchorPoint,
+  anchorsOf,
   boundaryPoint,
   connectorEnds,
   connectorRoute,
+  connectorTarget,
   contains,
+  endpointFor,
   estimateTextHeight,
   fitFontSize,
   intersects,
@@ -173,5 +177,70 @@ describe('connector routes', () => {
   it('bounds a connector by its whole route', () => {
     const conn = { id: 'c', type: 'connector', index: 'a2', x: 0, y: 0, from: { id: 'a' }, to: { id: 'b' }, color: '#000', style: 'elbow' } as const
     expect(objectBounds(conn, lookup)).toEqual({ x: 100, y: 50, w: 200, h: 200 })
+  })
+})
+
+describe('anchor points', () => {
+  const a = { id: 'a', type: 'sticky', index: 'a0', x: 0, y: 0, w: 100, h: 100, color: '#fff', text: '' } as const
+  const b = { id: 'b', type: 'sticky', index: 'a1', x: 300, y: 200, w: 100, h: 100, color: '#fff', text: '' } as const
+  const diamond = { id: 'd', type: 'shape', kind: 'diamond', index: 'a2', x: 600, y: 0, w: 200, h: 100, color: '#fff', text: '' } as const
+  const lookup = (id: string) => ({ a, b, d: diamond })[id as 'a' | 'b' | 'd']
+  const ordered: BoardObject[] = [a, b, diamond]
+
+  it('puts one anchor in the middle of each side, on the outline', () => {
+    expect(anchorsOf(a)).toEqual([
+      { side: 'top', point: { x: 50, y: 0 } },
+      { side: 'right', point: { x: 100, y: 50 } },
+      { side: 'bottom', point: { x: 50, y: 100 } },
+      { side: 'left', point: { x: 0, y: 50 } },
+    ])
+    // A diamond's anchors are its corners.
+    expect(anchorPoint({ x: 600, y: 0, w: 200, h: 100 }, 'diamond', 'right')).toEqual({ x: 800, y: 50 })
+  })
+
+  it('snaps an end to an anchor within reach, even from just outside the object', () => {
+    expect(connectorTarget({ x: 108, y: 54 }, ordered, 12)).toEqual({ id: 'a', side: 'right', point: { x: 100, y: 50 } })
+    expect(connectorTarget({ x: 52, y: 6 }, ordered, 12)).toMatchObject({ id: 'a', side: 'top' })
+  })
+
+  it('attaches to the whole object away from its anchors, and leaves open space free', () => {
+    expect(connectorTarget({ x: 30, y: 30 }, ordered, 12)).toEqual({ id: 'a', point: { x: 50, y: 50 } })
+    expect(connectorTarget({ x: 200, y: 140 }, ordered, 12)).toBeNull()
+    expect(connectorTarget({ x: 108, y: 54 }, ordered, 12, new Set(['a']))).toBeNull()
+  })
+
+  it('stores a side only when the end snapped to one', () => {
+    expect(endpointFor({ id: 'a', side: 'top', point: { x: 50, y: 0 } }, { x: 1, y: 1 })).toEqual({ id: 'a', side: 'top' })
+    expect(endpointFor({ id: 'a', point: { x: 50, y: 50 } }, { x: 1, y: 1 })).toEqual({ id: 'a' })
+    expect(endpointFor(null, { x: 12.345, y: 6.789 })).toEqual({ x: 12.3, y: 6.8 })
+  })
+
+  it('runs a pinned straight connector from anchor to anchor', () => {
+    const route = connectorRoute({ from: { id: 'a', side: 'bottom' }, to: { id: 'b', side: 'top' } }, lookup)!
+    expect(route.points).toEqual([50, 100, 350, 200])
+  })
+
+  it('leaves a pinned side straight out, then bends at right angles', () => {
+    const route = connectorRoute({ from: { id: 'a', side: 'bottom' }, to: { id: 'b', side: 'left' }, style: 'elbow' }, lookup)!
+    expect(route.points).toEqual([50, 100, 50, 250, 300, 250])
+    const vertical = connectorRoute({ from: { id: 'a', side: 'bottom' }, to: { id: 'b', side: 'top' }, style: 'elbow' }, lookup)!
+    expect(vertical.points).toEqual([50, 100, 50, 150, 350, 150, 350, 200])
+    expect(vertical.mid).toEqual({ x: 200, y: 150 })
+  })
+
+  it('curves out of pinned sides', () => {
+    const route = connectorRoute({ from: { id: 'a', side: 'top' }, to: { id: 'b', side: 'right' }, style: 'curved' }, lookup)!
+    const [sx, sy, c1x, c1y, c2x, c2y, ex, ey] = route.points
+    expect([sx, sy, ex, ey]).toEqual([50, 0, 400, 250])
+    expect(c1x).toBe(sx)
+    expect(c1y).toBeLessThan(sy)
+    expect(c2y).toBe(ey)
+    expect(c2x).toBeGreaterThan(ex)
+  })
+
+  it('pins one end and lets the other follow round', () => {
+    const route = connectorRoute({ from: { id: 'a', side: 'right' }, to: { id: 'b' } }, lookup)!
+    expect(route.start).toEqual({ x: 100, y: 50 })
+    expect(route.end.x).toBe(300)
   })
 })

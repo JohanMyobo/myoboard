@@ -141,7 +141,16 @@ Dockerfile, compose.yaml   the container image and how to run it
   with a default (`conn.style ?? 'straight'`, `conn.arrows ?? 'end'`).
 - Connectors are drawn from `connectorRoute` (`geometry.ts`), which also
   gives their bounds and label position; `shapeOutline` drives the canvas,
-  connector attachment and the toolbar icons, so the three agree.
+  connector attachment and the toolbar icons, so the three agree. An
+  attached end may carry a `side` (`top`, `right`, `bottom`, `left`): it is
+  pinned to that anchor point (`anchorPoint`) and leaves in that direction;
+  without one it meets the outline facing the other end. `connectorTarget`
+  decides what a pointer attaches to (an anchor within reach, else the
+  object, else nothing) and `endpointFor` turns that into an `Endpoint`.
+- Layout helpers are pure functions in `model/arrange.ts`: snapping and
+  guides (`snapBox`, `snapPoint`, `guidesFor`) and align/distribute moves,
+  applied with `movePatches` (a section carries what it holds) in one
+  `updateMany`, so one undo step.
 - Copies go in through `Board.insertCopies` (duplicate, paste, templates):
   one transaction, so one undo step, with connectors remapped to the
   copies.
@@ -237,6 +246,14 @@ Dockerfile, compose.yaml   the container image and how to run it
 - A team template's images are copied to the pseudo-board `_t_<template
   id>` (`/media/_t_<id>/...`), readable by anyone signed in; board ids
   starting with `_` are therefore refused.
+- Konva handles drawn over objects (the Transformer's resize anchors, a
+  connector's end handles) must stop the stage from reading a press on them
+  as a press on empty canvas, and must stay mounted while they are dragged:
+  unmounting a shape in its own `pointerdown` sends the browser's following
+  `mousedown` to whatever is underneath, which then starts dragging.
+- Resize handles are styled in `styleAnchor` (wide hit area, bars on the
+  sides); snapping goes through `anchorDragBoundFunc`, which works in
+  absolute (screen) coordinates.
 - While a vote runs, the canvas turns clicks on objects into votes
   (`onVote`): no selection, dragging, resizing or double-click editing.
 - Exports render through Konva (`renderBoard`): comment pins and vote
@@ -303,7 +320,7 @@ information only. Keep it that way:
 
 v2 is done: access (sign-in, permissions, board list, CI), content
 (images, copy and paste, 10 shapes, connectors with labels) and workshops
-(comments, templates, timer, voting, exports, Docker image); parity 86/100.
+(comments, templates, timer, voting, exports, Docker image); parity 87/100.
 Candidates next, see `replica/parity.md`: rich text, files other than
 images, pinch zoom. The maintainer sets the scope: check with the user
 before starting a large feature.

@@ -165,7 +165,7 @@ export class Board {
     const remap = (endpoint: Endpoint): Endpoint => {
       if (!isAttached(endpoint)) return endpoint
       const mapped = newIds.get(endpoint.id)
-      return mapped ? { id: mapped } : endpoint
+      return mapped ? { ...endpoint, id: mapped } : endpoint
     }
     const copies = originals.map((obj) => {
       const { id, index, ...rest } = obj
