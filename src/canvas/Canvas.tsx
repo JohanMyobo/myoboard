@@ -314,7 +314,7 @@ export function Canvas(props: CanvasProps) {
         const id = board.create({
           type: 'section',
           ...box,
-          title: `Section ${count + 1}`,
+          title: `Zone ${count + 1}`,
           color: SECTION_COLORS[0].value,
           author,
         })
@@ -827,7 +827,7 @@ export function Canvas(props: CanvasProps) {
         return null
       case 'marquee': {
         const box = normalizeBox(draft.start, draft.end)
-        return <Rect {...box} width={box.w} height={box.h} fill="rgba(37,99,235,0.08)" stroke={ACCENT} strokeWidth={1 / s} />
+        return <Rect {...box} width={box.w} height={box.h} fill="rgba(56,182,255,0.08)" stroke={ACCENT} strokeWidth={1 / s} />
       }
       case 'shape':
       case 'section': {

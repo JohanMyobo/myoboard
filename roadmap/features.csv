@@ -1,0 +1,46 @@
+feature,area,priority,scope,status,notes
+Infinite canvas with pan and zoom,canvas,must,core,yes,
+Sticky notes in several colours,sticky notes,must,core,yes,8 colours; text shrinks to fit; author shown
+Edit text directly on the canvas,editing,must,core,yes,
+Shapes with a label,shapes,must,core,yes,10 shapes: rectangle pill ellipse diamond triangle hexagon parallelogram arrow star cylinder
+Connectors attached to objects,connectors,must,core,yes,straight elbow or curved; labels; arrowheads at none one or both ends; attach to each shape's real outline
+Select move and resize objects,editing,must,core,yes,large handles and side bars; several objects at once; size shown while resizing; Shift keeps proportions and Alt resizes from the centre
+Multi-select with Shift and a selection box,editing,must,core,yes,
+Undo and redo,editing,must,core,yes,only your own edits
+Real-time multiplayer editing,collaboration,must,core,yes,property-level merge
+Live cursors with names,collaboration,must,core,yes,
+Share a board with a link,sharing,must,core,yes,
+Autosave,persistence,must,core,yes,server file plus browser copy
+Sign-in and per-board permissions,accounts,must,core,yes,company accounts through OpenID Connect (Google or Microsoft) or name and email locally; owner editor viewer; link access
+Board list with recent owned and shared boards,accounts,should,core,yes,search and filters; owners delete boards
+Zones that group content,zones,should,core,yes,content moves with the zone
+Pen drawing,drawing,should,core,yes,3 widths and 6 colours
+Reactions placed on the board,reactions,should,core,yes,8 emoji
+Free text,text,should,core,yes,
+Duplicate delete and bring to front,editing,should,core,yes,
+Alignment guides and snapping,editing,should,core,yes,edges and centres snap to nearby objects while moving or resizing; Alt moves freely
+Align and distribute a selection,editing,should,core,yes,six alignments and even spacing across or down; zones carry their content
+Connector anchor points,connectors,should,core,yes,ends snap to the middle of each side within 14 px; drag an end to attach it elsewhere; elbows and curves leave the side they start from
+Change colour and shape from the selection,editing,should,core,yes,
+See who is on the board,collaboration,should,core,yes,
+See what others have selected,collaboration,should,core,yes,
+Export the board as an image,export,should,core,yes,PNG JPG or PDF; the whole board or the selection
+Comments,comments,should,core,yes,pinned to the board or to an object; threads with replies; resolve; a panel of open and resolved threads
+Images and file uploads,media,should,core,partial,images (PNG JPEG GIF WebP) from a button or by dropping or pasting; no other files
+Copy and paste,editing,should,core,yes,within and between boards through the system clipboard (images copied over); pasted lines become sticky notes
+Templates,templates,should,core,yes,retrospective brainstorm and kanban built in; save a board or a selection as a team template
+Voting sessions,facilitation,should,core,yes,votes per person; hidden until the vote ends; ranked results
+Timer,facilitation,should,core,yes,shared countdown on the server's clock; pause add time stop; chime
+Rich text (bold lists sizes),text,should,core,no,
+Tables,tables,could,core,no,
+Short messages next to your cursor,collaboration,could,core,no,
+Live emoji bursts,reactions,could,core,no,
+Follow a collaborator's view,collaboration,could,core,no,
+Highlighter and decorative tape,drawing,could,core,no,
+Code blocks,text,could,core,no,
+Audio chat,collaboration,could,core,no,
+AI board generation and summaries,ai,could,core,no,
+Touch and mobile,platform,could,core,partial,pointer events and a compact toolbar; no pinch zoom
+Plugins and extensions,extensibility,could,core,skip,"an ecosystem of its own, out of scope for a self-hosted board"
+Works offline and syncs on reconnect,persistence,could,extra,yes,local IndexedDB copy
+Self-hosted under an open-source licence,platform,could,extra,yes,MIT

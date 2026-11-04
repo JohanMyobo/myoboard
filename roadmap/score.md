@@ -1,8 +1,8 @@
-## Parity: 86.9 / 100
+## Feature checklist: 86.9 / 100
 
-features 86.9  (42 counted, must-haves 13 of 13 done)
+42 features scored, must-haves 13 of 13 done
 
-## By area, weakest first
+## By area, least built first
 - tables                         0.0  (1 features)
 - ai                             0.0  (1 features)
 - text                          40.0  (3 features)
@@ -19,7 +19,7 @@ features 86.9  (42 counted, must-haves 13 of 13 done)
 - sharing                      100.0  (1 features)
 - persistence                  100.0  (1 features)
 - accounts                     100.0  (2 features)
-- sections                     100.0  (1 features)
+- zones                        100.0  (1 features)
 - export                       100.0  (1 features)
 - comments                     100.0  (1 features)
 - templates                    100.0  (1 features)
@@ -30,17 +30,17 @@ features 86.9  (42 counted, must-haves 13 of 13 done)
 - [should] media: Images and file uploads, partial  (images (PNG JPEG GIF WebP) from a button or by dropping or pasting; no other files)
 - [could] ai: AI board generation and summaries, no
 - [could] collaboration: Audio chat, no
-- [could] collaboration: Cursor chat, no
-- [could] collaboration: Follow or spotlight a collaborator, no
-- [could] drawing: Highlighter and washi tape, no
-- [could] reactions: Emotes and high fives, no
+- [could] collaboration: Follow a collaborator's view, no
+- [could] collaboration: Short messages next to your cursor, no
+- [could] drawing: Highlighter and decorative tape, no
+- [could] reactions: Live emoji bursts, no
 - [could] tables: Tables, no
 - [could] text: Code blocks, no
 - [could] platform: Touch and mobile, partial  (pointer events and a compact toolbar; no pinch zoom)
 
 ## Left out on purpose (not scored)
-- Widgets and plugin marketplace: their developer ecosystem is not part of the product to rebuild
+- Plugins and extensions: an ecosystem of its own, out of scope for a self-hosted board
 
-## Yours, not in the original (not scored)
+## Extras (not scored)
 - Works offline and syncs on reconnect
 - Self-hosted under an open-source licence

@@ -1,43 +1,48 @@
 /** Colours and type settings shared by the canvas and the UI. */
 
-export const INK = '#1d1d1b'
-export const ACCENT = '#2563eb'
+/** Myobo's brand blues: navy for ink-like accents, sky for selection and focus. */
+export const BRAND_NAVY = '#0d3272'
+export const BRAND_SKY = '#38b6ff'
+
+export const INK = '#101c33'
+export const ACCENT = BRAND_SKY
 export const FONT_FAMILY =
   'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
 export const LINE_HEIGHT = 1.3
 
 export const STICKY_COLORS = [
-  { name: 'Lemon', value: '#ffe58f' },
-  { name: 'Apricot', value: '#ffc58a' },
-  { name: 'Rose', value: '#ffb3c7' },
-  { name: 'Lilac', value: '#d7c6ff' },
-  { name: 'Sky', value: '#a9d4ff' },
-  { name: 'Mint', value: '#9ee8d7' },
-  { name: 'Lime', value: '#c5ec9f' },
-  { name: 'Stone', value: '#e4e4e1' },
+  { name: 'Lemon', value: '#ffe47a' },
+  { name: 'Apricot', value: '#ffbf8f' },
+  { name: 'Rose', value: '#ffadc4' },
+  { name: 'Lilac', value: '#cfc0ff' },
+  { name: 'Sky', value: '#9bd8ff' },
+  { name: 'Mint', value: '#93e6cf' },
+  { name: 'Lime', value: '#cdeb94' },
+  { name: 'Stone', value: '#e3e7ee' },
 ] as const
 
 export const SHAPE_COLORS = [
   { name: 'White', value: '#ffffff' },
   ...STICKY_COLORS,
-  { name: 'Ink', value: '#3a3a37' },
+  { name: 'Ink', value: '#2b3650' },
 ] as const
 
 export const SECTION_COLORS = [
-  { name: 'Paper', value: '#f7f6f2' },
-  { name: 'Lemon', value: '#fff6d6' },
-  { name: 'Rose', value: '#ffe8ee' },
-  { name: 'Sky', value: '#e3f0ff' },
-  { name: 'Mint', value: '#ddf7f0' },
-  { name: 'Lilac', value: '#efe9ff' },
+  { name: 'Paper', value: '#f4f6fa' },
+  { name: 'Lemon', value: '#fff5cf' },
+  { name: 'Rose', value: '#ffe7ef' },
+  { name: 'Sky', value: '#e1f3ff' },
+  { name: 'Mint', value: '#dcf6ee' },
+  { name: 'Lilac', value: '#eeeaff' },
 ] as const
 
 export const PEN_COLORS = [
-  { name: 'Ink', value: '#1d1d1b' },
+  { name: 'Ink', value: '#101c33' },
+  { name: 'Navy', value: '#0d3272' },
   { name: 'Red', value: '#e5484d' },
   { name: 'Orange', value: '#f76b15' },
   { name: 'Green', value: '#30a46c' },
-  { name: 'Blue', value: '#0090ff' },
+  { name: 'Blue', value: '#38b6ff' },
   { name: 'Violet', value: '#8e4ec6' },
 ] as const
 
@@ -55,6 +60,17 @@ export const PEOPLE_COLORS = [
   '#8e4ec6',
   '#d6409f',
 ] as const
+
+/** The fill darkened by `amount` (0 to 1), for a sticky note's folded corner. Other colours are returned as they are. */
+export function darken(fill: string, amount: number): string {
+  const hex = fill.replace('#', '')
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return fill
+  const channel = (i: number) =>
+    Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - amount))
+      .toString(16)
+      .padStart(2, '0')
+  return `#${channel(0)}${channel(2)}${channel(4)}`
+}
 
 /** Readable text colour on top of a fill. */
 export function textColorOn(fill: string): string {

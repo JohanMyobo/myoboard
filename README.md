@@ -1,18 +1,20 @@
 # Myoboard
 
 An open-source, self-hostable collaborative whiteboard: sticky notes, shapes,
-connectors, sections, a pen, reaction stamps and live cursors, synced in real
-time between everyone on the same board.
+connectors, zones, a pen, reactions and live cursors, synced in real time
+between everyone on the same board.
 
 ![Three people running a sprint retro on Myoboard: notes, a vote and its results, a shared timer, a comment and live cursors](docs/screenshot.png)
 
 ## Features
 
+- **Its own look**: in the Myobo blues (navy and sky), Lustria titles,
+  sticky notes with a folded corner, zones tagged in navy, a squared canvas.
 - **Infinite canvas**: scroll or Space-drag to pan, Ctrl/⌘ + scroll (or pinch) to zoom, zoom to fit.
 - **Objects**: sticky notes (8 colours, text that shrinks to fit, author name),
   10 shapes with labels (rectangle, pill, ellipse, diamond, triangle,
   hexagon, parallelogram, arrow, star, cylinder), free text, pen strokes,
-  images, sections that carry their content when moved, reaction stamps.
+  images, zones that carry their content when moved, emoji reactions.
 - **Connectors**: attached to objects (they meet each shape's real outline,
   or snap to the anchor point in the middle of a side as you come close),
   straight, elbow or curved, with a label and arrowheads at either end; drag
@@ -162,7 +164,7 @@ variables.
 | -------------------------- | --------------------------------- |
 | `V` / `H`                  | Select / hand (pan)               |
 | `S` / `R` / `T`            | Sticky note / shape / text        |
-| `P` / `C` / `F` / `E`      | Pen / connector / section / stamp |
+| `P` / `C` / `F` / `E`      | Pen / connector / zone / reaction |
 | `M`                        | Comment                           |
 | Space + drag               | Pan with any tool                 |
 | Enter or double-click      | Edit the selected object's text (a connector's label) |
@@ -227,8 +229,8 @@ images (toolbar, drop, paste), copy and paste within and between boards,
 shapes and labelled connectors, comments between two people, templates,
 the shared timer, voting, exports, two people editing the same board
 (edits, drags, cursors, presence),
-persistence across reloads and devices, connectors, sections and undo, pen
-strokes, shapes, stamps and PNG export, and frame times with 500 sticky
+persistence across reloads and devices, connectors, zones and undo, pen
+strokes, shapes, reactions and PNG export, and frame times with 500 sticky
 notes. GitHub Actions runs everything on Node 22 and 24 for every push,
 and builds and smoke-tests the Docker image.
 
@@ -249,9 +251,9 @@ then, Claude Code ignores the project's permissions).
 ## Clean-room build
 
 Myoboard was written from public information only: published engineering
-articles about real-time editing and public product documentation. No
+articles about real-time editing and general whiteboard conventions. No
 proprietary code, private API, asset, icon, copy or branding was used. The
-feature matrix and parity score are in [`replica/`](replica).
+feature checklist and its score are in [`roadmap/`](roadmap).
 
 ## Security
 
@@ -267,9 +269,9 @@ feature matrix and parity score are in [`replica/`](replica).
 
 ## Not built yet
 
-Rich text (bold, lists, sizes), files other than images, tables, cursor
-chat, following a collaborator, AI. See
-[`replica/parity.md`](replica/parity.md) for the full list, in build order.
+Rich text (bold, lists, sizes), files other than images, tables, short
+messages next to your cursor, following a collaborator, AI. See
+[`roadmap/score.md`](roadmap/score.md) for the full list, in build order.
 
 ## License
 

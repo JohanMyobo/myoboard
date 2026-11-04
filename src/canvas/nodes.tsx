@@ -3,11 +3,12 @@ import { Arrow, Circle, Ellipse, Group, Image as KonvaImage, Label, Line, Rect, 
 import type { Context } from 'konva/lib/Context'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import type { Shape as KonvaShape } from 'konva/lib/Shape'
-import { ACCENT, FONT_FAMILY, INK, LINE_HEIGHT, textColorOn } from '../model/palette'
+import { ACCENT, BRAND_NAVY, FONT_FAMILY, INK, LINE_HEIGHT, darken, textColorOn } from '../model/palette'
 import {
   STAMP_RADIUS,
   STICKY_PADDING,
   fitFontSize,
+  stickyFoldSize,
   stickyTextBox,
   textObjectHeight,
 } from '../model/geometry'
@@ -82,7 +83,7 @@ function stickyShadowImage(): HTMLCanvasElement {
   const ctx = canvas.getContext('2d')!
   // Draw the note off the canvas and offset its shadow back in, so only the
   // shadow lands. Shadow settings are in device pixels, hence SHADOW_RES.
-  ctx.shadowColor = 'rgba(29,29,27,0.14)'
+  ctx.shadowColor = 'rgba(16,28,51,0.14)'
   ctx.shadowBlur = 10 * SHADOW_RES
   ctx.shadowOffsetX = size
   ctx.shadowOffsetY = 3 * SHADOW_RES
@@ -100,6 +101,55 @@ function drawStickyShadow(ctx: Context, w: number, h: number) {
   ctx.drawImage(image, -SHADOW_PAD * sx, -SHADOW_PAD * sy, (image.width / SHADOW_RES) * sx, (image.height / SHADOW_RES) * sy)
 }
 
+const foldColors = new Map<string, string>()
+function foldColor(fill: string): string {
+  let color = foldColors.get(fill)
+  if (!color) {
+    color = darken(fill, 0.16)
+    foldColors.set(fill, color)
+  }
+  return color
+}
+
+/**
+ * A sticky note with its bottom-right corner folded up, in one node: a second
+ * node per note for the fold doubles the frame time at 26% zoom with 500 notes.
+ */
+function drawSticky(ctx: Context, shape: KonvaShape) {
+  const w = shape.width()
+  const h = shape.height()
+  const fold = stickyFoldSize(w, h)
+  const r = 4
+  ctx.beginPath()
+  ctx.moveTo(r, 0)
+  ctx.lineTo(w - r, 0)
+  ctx.arcTo(w, 0, w, r, r)
+  ctx.lineTo(w, h - fold)
+  ctx.lineTo(w - fold, h)
+  ctx.lineTo(r, h)
+  ctx.arcTo(0, h, 0, h - r, r)
+  ctx.lineTo(0, r)
+  ctx.arcTo(0, 0, r, 0, r)
+  ctx.closePath()
+  ctx.fillStrokeShape(shape)
+  ctx.beginPath()
+  ctx.moveTo(w, h - fold)
+  ctx.lineTo(w - fold + 3, h - fold)
+  ctx.arcTo(w - fold, h - fold, w - fold, h - fold + 3, 3)
+  ctx.lineTo(w - fold, h)
+  ctx.closePath()
+  ctx.setAttr('fillStyle', foldColor(shape.fill() as string))
+  ctx.fill()
+}
+
+/** Hits the whole note: the fold drawn in its own colour would not register on the hit canvas. */
+function hitSticky(ctx: Context, shape: KonvaShape) {
+  ctx.beginPath()
+  ctx.rect(0, 0, shape.width(), shape.height())
+  ctx.closePath()
+  ctx.fillStrokeShape(shape)
+}
+
 export const StickyNode = memo(function StickyNode({ obj, draggable, editing, lowDetail, handlers }: NodeProps<StickyObject>) {
   const box = stickyTextBox(obj.w, obj.h)
   const fontSize = fitFontSize(obj.text, box.width, box.height)
@@ -107,7 +157,7 @@ export const StickyNode = memo(function StickyNode({ obj, draggable, editing, lo
     <Group {...groupProps(obj, draggable, handlers)}>
       {/* No size, so the resize handles keep fitting the note, not its shadow. */}
       {!lowDetail && <Shape listening={false} sceneFunc={(ctx) => drawStickyShadow(ctx, obj.w, obj.h)} />}
-      <Rect width={obj.w} height={obj.h} fill={obj.color} cornerRadius={4} perfectDrawEnabled={false} />
+      <Shape width={obj.w} height={obj.h} fill={obj.color} sceneFunc={drawSticky} hitFunc={hitSticky} perfectDrawEnabled={false} />
       {!editing && !lowDetail && (
         <Text
           x={STICKY_PADDING}
@@ -133,7 +183,7 @@ export const StickyNode = memo(function StickyNode({ obj, draggable, editing, lo
           text={obj.author}
           fontSize={11}
           fontFamily={FONT_FAMILY}
-          fill="rgba(29,29,27,0.55)"
+          fill="rgba(16,28,51,0.55)"
           wrap="none"
           ellipsis
           listening={false}
@@ -185,7 +235,7 @@ function ShapeBody({ kind, w, h, style }: { kind: ShapeKind; w: number; h: numbe
 }
 
 export const ShapeNode = memo(function ShapeNode({ obj, draggable, editing, lowDetail, handlers }: NodeProps<ShapeObject>) {
-  const stroke = obj.color === '#ffffff' ? 'rgba(29,29,27,0.55)' : 'rgba(29,29,27,0.25)'
+  const stroke = obj.color === '#ffffff' ? 'rgba(16,28,51,0.55)' : 'rgba(16,28,51,0.25)'
   const style = { fill: obj.color, stroke, strokeWidth: 1.5, perfectDrawEnabled: false }
   const label = labelBox(obj.kind, obj.w, obj.h)
   return (
@@ -220,7 +270,7 @@ export const TextNode = memo(function TextNode({ obj, draggable, editing, lowDet
   return (
     <Group {...groupProps(obj, draggable, handlers)}>
       {editing || lowDetail ? (
-        <Rect width={obj.w} height={height} fill={lowDetail ? 'rgba(29,29,27,0.14)' : undefined} cornerRadius={4} />
+        <Rect width={obj.w} height={height} fill={lowDetail ? 'rgba(16,28,51,0.14)' : undefined} cornerRadius={4} />
       ) : (
         <Text
           width={obj.w}
@@ -266,20 +316,20 @@ export const SectionNode = memo(function SectionNode({ obj, draggable, editing, 
         height={obj.h}
         fill={obj.color}
         cornerRadius={10}
-        stroke="rgba(29,29,27,0.16)"
+        stroke="rgba(13,50,114,0.18)"
         strokeWidth={1}
         listening={false}
         perfectDrawEnabled={false}
       />
       <Label x={SECTION_TITLE_INSET} y={SECTION_TITLE_INSET} opacity={editing ? 0 : 1}>
-        <Tag fill="rgba(255,255,255,0.9)" stroke="rgba(29,29,27,0.12)" strokeWidth={1} cornerRadius={6} />
+        <Tag fill={BRAND_NAVY} cornerRadius={999} />
         <Text
-          text={obj.title || 'Section'}
+          text={obj.title || 'Zone'}
           padding={6}
           fontSize={SECTION_TITLE_SIZE}
           fontStyle="600"
           fontFamily={FONT_FAMILY}
-          fill={INK}
+          fill="#ffffff"
           perfectDrawEnabled={false}
         />
       </Label>
@@ -295,7 +345,7 @@ export const StampNode = memo(function StampNode({ obj, draggable, handlers }: N
         fill="#ffffff"
         stroke={obj.color}
         strokeWidth={2.5}
-        shadowColor="#1d1d1b"
+        shadowColor="#101c33"
         shadowOpacity={0.12}
         shadowBlur={6}
         shadowOffsetY={2}
@@ -385,7 +435,7 @@ export const ImageNode = memo(function ImageNode({ obj, draggable, handlers }: N
         <KonvaImage image={entry.image} width={obj.w} height={obj.h} perfectDrawEnabled={false} />
       ) : (
         <>
-          <Rect width={obj.w} height={obj.h} fill="#ecece8" stroke="rgba(29,29,27,0.18)" strokeWidth={1} dash={[6, 4]} cornerRadius={4} />
+          <Rect width={obj.w} height={obj.h} fill="#e9edf3" stroke="rgba(16,28,51,0.18)" strokeWidth={1} dash={[6, 4]} cornerRadius={4} />
           <Text
             width={obj.w}
             height={obj.h}
@@ -395,7 +445,7 @@ export const ImageNode = memo(function ImageNode({ obj, draggable, handlers }: N
             text={status === 'failed' ? 'Image unavailable' : 'Loading image…'}
             fontSize={13}
             fontFamily={FONT_FAMILY}
-            fill="#8a8a83"
+            fill="#7d869b"
             listening={false}
           />
         </>
@@ -445,7 +495,7 @@ export const ConnectorNode = memo(function ConnectorNode({ id, route, color, arr
       />
       {size && (
         <Group x={route.mid.x - size.w / 2} y={route.mid.y - size.h / 2}>
-          <Rect width={size.w} height={size.h} fill="#ffffff" stroke={selected ? ACCENT : 'rgba(29,29,27,0.2)'} strokeWidth={1} cornerRadius={6} />
+          <Rect width={size.w} height={size.h} fill="#ffffff" stroke={selected ? ACCENT : 'rgba(16,28,51,0.2)'} strokeWidth={1} cornerRadius={6} />
           <Text
             x={LABEL_PAD_X}
             y={LABEL_PAD_Y}

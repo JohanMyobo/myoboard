@@ -72,7 +72,7 @@ export function TextEditor({ obj, anchor, camera, onChange, onClose }: TextEdito
     onChange: (e: { target: { value: string } }) => change(e.target.value),
     onKeyDown,
     onBlur: onClose,
-    'aria-label': obj.type === 'section' ? 'Section title' : obj.type === 'connector' ? 'Connector label' : 'Text',
+    'aria-label': obj.type === 'section' ? 'Zone title' : obj.type === 'connector' ? 'Connector label' : 'Text',
   }
 
   switch (obj.type) {

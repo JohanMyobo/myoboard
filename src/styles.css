@@ -1,18 +1,22 @@
 :root {
-  --ink: #1d1d1b;
-  --ink-soft: #55554f;
-  --muted: #8a8a83;
-  --line: rgba(29, 29, 27, 0.1);
-  --line-strong: rgba(29, 29, 27, 0.18);
+  --ink: #101c33;
+  --ink-soft: #46506a;
+  --muted: #7d869b;
+  --line: rgba(13, 50, 114, 0.12);
+  --line-strong: rgba(13, 50, 114, 0.22);
   --panel: #ffffff;
-  --hover: #f2f2ee;
-  --canvas: #f4f4f1;
-  --dot: #cfcfc8;
-  --accent: #2563eb;
+  --hover: #eef3fa;
+  --canvas: #f5f7fb;
+  --grid: rgba(13, 50, 114, 0.07);
+  /* Myobo navy for buttons and pressed tools, Myobo sky for focus and selection. */
+  --accent: #0d3272;
+  --sky: #38b6ff;
   --danger: #d93036;
-  --radius: 12px;
-  --shadow: 0 1px 2px rgba(29, 29, 27, 0.06), 0 6px 20px rgba(29, 29, 27, 0.08);
+  --radius: 10px;
+  --shadow: 0 0 0 1px rgba(13, 50, 114, 0.04), 0 2px 4px rgba(13, 50, 114, 0.06), 0 10px 24px -10px rgba(13, 50, 114, 0.22);
   --font: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-title: Lustria, Georgia, 'Times New Roman', serif;
+  --grid-lines: linear-gradient(to right, var(--grid) 1px, transparent 1px), linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
   color-scheme: light;
 }
 
@@ -44,7 +48,7 @@ button {
 
 button:focus-visible,
 input:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--sky);
   outline-offset: 2px;
 }
 
@@ -77,7 +81,7 @@ kbd {
   inset: 0;
   overflow: hidden;
   background-color: var(--canvas);
-  background-image: radial-gradient(circle, var(--dot) 1.1px, transparent 1.4px);
+  background-image: var(--grid-lines);
   touch-action: none;
 }
 
@@ -159,14 +163,14 @@ kbd {
   padding: 0 14px;
   border: 0;
   border-radius: 8px;
-  background: var(--ink);
+  background: var(--accent);
   color: #fff;
   font-weight: 600;
   cursor: pointer;
 }
 
 .primary-button:hover {
-  background: #333330;
+  background: #0a2659;
 }
 
 .divider {
@@ -214,7 +218,8 @@ kbd {
   border-radius: 8px;
   background: transparent;
   font: inherit;
-  font-weight: 600;
+  font-family: var(--font-title);
+  font-size: 16px;
   color: var(--ink);
   text-overflow: ellipsis;
 }
@@ -308,7 +313,7 @@ kbd {
 }
 
 .tool-button[aria-pressed='true'] {
-  background: var(--ink);
+  background: var(--accent);
   color: #fff;
 }
 
@@ -340,7 +345,7 @@ kbd {
 }
 
 .stamp-choice[aria-pressed='true'] {
-  background: #e7ecfd;
+  background: #e1f3ff;
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
@@ -384,7 +389,7 @@ kbd {
 
 .segmented button[aria-pressed='true'] {
   background: #fff;
-  box-shadow: 0 1px 2px rgba(29, 29, 27, 0.15);
+  box-shadow: 0 1px 2px rgba(16, 28, 51, 0.15);
 }
 
 .pen-dot {
@@ -609,7 +614,7 @@ kbd {
   padding: 24px;
   overflow: auto;
   background-color: var(--canvas);
-  background-image: radial-gradient(circle, var(--dot) 1.1px, transparent 1.4px);
+  background-image: var(--grid-lines);
   background-size: 24px 24px;
 }
 
@@ -617,9 +622,8 @@ kbd {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-family: var(--font-title);
+  font-size: 20px;
 }
 
 .login-card,
@@ -634,8 +638,9 @@ kbd {
 .login-card h1,
 .message-card h1 {
   margin: 10px 0 0;
-  font-size: 22px;
-  letter-spacing: -0.01em;
+  font-family: var(--font-title);
+  font-size: 26px;
+  font-weight: 400;
 }
 
 .message-card p,
@@ -705,7 +710,7 @@ input:focus,
 select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 3px rgba(56, 182, 255, 0.3);
 }
 
 .primary-button.wide {
@@ -763,7 +768,7 @@ select:focus {
   height: 60px;
   padding: 0 24px;
   border-bottom: 1px solid var(--line);
-  background: rgba(244, 244, 241, 0.92);
+  background: rgba(245, 247, 251, 0.92);
   backdrop-filter: blur(8px);
 }
 
@@ -785,8 +790,9 @@ select:focus {
 
 .home-title-row h1 {
   margin: 0;
-  font-size: 26px;
-  letter-spacing: -0.02em;
+  font-family: var(--font-title);
+  font-size: 32px;
+  font-weight: 400;
 }
 
 .home-toolbar {
@@ -817,7 +823,7 @@ select:focus {
 
 .search:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 3px rgba(56, 182, 255, 0.3);
 }
 
 .search input {
@@ -869,7 +875,7 @@ select:focus {
 }
 
 .board-link:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--sky);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -881,7 +887,7 @@ select:focus {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  color: rgba(29, 29, 27, 0.55);
+  color: rgba(16, 28, 51, 0.55);
 }
 
 .board-name {
@@ -911,7 +917,7 @@ select:focus {
 }
 
 .role-badge.owner {
-  background: #e7ecfd;
+  background: #e1f3ff;
   color: #1e40af;
 }
 
@@ -976,7 +982,7 @@ select:focus {
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(29, 29, 27, 0.32);
+  background: rgba(16, 28, 51, 0.32);
 }
 
 .modal {
@@ -997,7 +1003,9 @@ select:focus {
 
 .modal-header h2 {
   margin: 0;
-  font-size: 17px;
+  font-family: var(--font-title);
+  font-size: 19px;
+  font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1179,7 +1187,7 @@ a.brand:hover {
 
 .shape-grid button[aria-pressed='true'] {
   background: #fff;
-  box-shadow: 0 1px 2px rgba(29, 29, 27, 0.15);
+  box-shadow: 0 1px 2px rgba(16, 28, 51, 0.15);
 }
 
 .shape-menu {
@@ -1217,7 +1225,7 @@ a.brand:hover {
 }
 
 .icon-button.active {
-  background: #e7ecfd;
+  background: #e1f3ff;
   color: var(--accent);
 }
 
@@ -1416,7 +1424,7 @@ a.brand:hover {
   height: 10px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+  box-shadow: 0 0 0 4px rgba(56, 182, 255, 0.18);
   flex: none;
 }
 
@@ -1608,7 +1616,7 @@ form.comment-popover {
 .comment-popover textarea:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 3px rgba(56, 182, 255, 0.3);
 }
 
 .composer-actions {
@@ -1702,7 +1710,9 @@ form.comment-popover {
 
 .side-panel-header h2 {
   margin: 0;
-  font-size: 16px;
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 400;
 }
 
 .side-panel .segmented.tabs {
@@ -1786,7 +1796,7 @@ form.comment-popover {
 .template-card:hover:not(:disabled),
 .template-card.team:hover {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(56, 182, 255, 0.25);
 }
 
 .template-card:disabled {

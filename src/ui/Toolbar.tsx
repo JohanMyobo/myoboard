@@ -1,4 +1,4 @@
-import { Frame, Hand, ImagePlus, MessageCircle, MousePointer2, PenLine, Shapes, Spline, Stamp, StickyNote, Type } from 'lucide-react'
+import { Hand, ImagePlus, MessageCircle, MousePointer2, PenLine, Shapes, SmilePlus, Spline, SquareDashed, StickyNote, Type } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { PEN_COLORS, SHAPE_COLORS, STAMPS, STICKY_COLORS } from '../model/palette'
 import type { ShapeKind } from '../model/types'
@@ -15,8 +15,8 @@ const TOOLS: { tool: Tool; label: string; shortcut: string; icon: LucideIcon }[]
   { tool: 'text', label: 'Text', shortcut: 'T', icon: Type },
   { tool: 'pen', label: 'Pen', shortcut: 'P', icon: PenLine },
   { tool: 'connector', label: 'Connector', shortcut: 'C', icon: Spline },
-  { tool: 'section', label: 'Section', shortcut: 'F', icon: Frame },
-  { tool: 'stamp', label: 'Stamp', shortcut: 'E', icon: Stamp },
+  { tool: 'section', label: 'Zone', shortcut: 'F', icon: SquareDashed },
+  { tool: 'stamp', label: 'Reaction', shortcut: 'E', icon: SmilePlus },
   { tool: 'comment', label: 'Comment', shortcut: 'M', icon: MessageCircle },
 ]
 
@@ -115,14 +115,14 @@ function ToolOptionsPanel({ tool, options, onOptionsChange }: Pick<ToolbarProps,
       )
     case 'stamp':
       return (
-        <div className="panel tool-options stamps" role="group" aria-label="Stamp">
+        <div className="panel tool-options stamps" role="group" aria-label="Reaction">
           {STAMPS.map((stamp) => (
             <button
               key={stamp}
               type="button"
               className="stamp-choice"
               aria-pressed={options.stamp === stamp}
-              aria-label={`Stamp ${stamp}`}
+              aria-label={`Reaction ${stamp}`}
               onClick={() => onOptionsChange({ stamp })}
             >
               {stamp}

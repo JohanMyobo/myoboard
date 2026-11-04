@@ -66,7 +66,7 @@ function brainstorm(): BoardObject[] {
         y: 0,
         from: { id: 'topic' },
         to: { id: note.key },
-        color: '#8a8a83',
+        color: '#7d869b',
         style: 'curved',
         arrows: 'none',
         key: `link${i}`,

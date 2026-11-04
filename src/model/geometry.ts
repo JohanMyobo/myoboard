@@ -48,6 +48,11 @@ export function stickyTextBox(w: number, h: number): { width: number; height: nu
   }
 }
 
+/** Side of the folded corner at a sticky note's bottom right, Myoboard's signature. */
+export function stickyFoldSize(w: number, h: number): number {
+  return Math.round(Math.min(28, Math.max(10, Math.min(w, h) * 0.12)))
+}
+
 export function textObjectHeight(text: string, w: number, fontSize: number): number {
   return Math.max(fontSize * LINE_HEIGHT, estimateTextHeight(text, w, fontSize))
 }

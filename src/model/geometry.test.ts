@@ -13,6 +13,7 @@ import {
   intersects,
   objectBounds,
   objectsInside,
+  stickyFoldSize,
   topmostAt,
 } from './geometry'
 import type { BoardObject } from './types'
@@ -104,6 +105,12 @@ describe('text layout', () => {
   it('shrinks the font until the text fits', () => {
     expect(fitFontSize('short', 168, 148)).toBe(24)
     expect(fitFontSize('word '.repeat(80), 168, 148)).toBeLessThan(24)
+  })
+
+  it('folds a corner in proportion to the note, within bounds', () => {
+    expect(stickyFoldSize(200, 200)).toBe(24)
+    expect(stickyFoldSize(800, 600)).toBe(28)
+    expect(stickyFoldSize(40, 300)).toBe(10)
   })
 })
 

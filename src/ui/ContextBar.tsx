@@ -202,9 +202,9 @@ function labelFor(obj: BoardObject): string {
     case 'connector':
       return 'Connector'
     case 'section':
-      return 'Section'
+      return 'Zone'
     case 'stamp':
-      return 'Stamp'
+      return 'Reaction'
     case 'image':
       return 'Image'
   }

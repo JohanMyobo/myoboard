@@ -13,18 +13,18 @@ export function TemplatePreview({ objects }: { objects: readonly BoardObject[] }
       {objects.map((obj) => {
         switch (obj.type) {
           case 'section':
-            return <rect key={obj.id} x={obj.x} y={obj.y} width={obj.w} height={obj.h} rx={16} fill={obj.color} stroke="rgba(29,29,27,0.15)" strokeWidth={4} />
+            return <rect key={obj.id} x={obj.x} y={obj.y} width={obj.w} height={obj.h} rx={16} fill={obj.color} stroke="rgba(16,28,51,0.15)" strokeWidth={4} />
           case 'sticky':
           case 'image':
             return <rect key={obj.id} x={obj.x} y={obj.y} width={obj.w} height={obj.h} rx={6} fill={obj.type === 'sticky' ? obj.color : '#d9d9d4'} />
           case 'shape':
             return obj.kind === 'ellipse' ? (
-              <ellipse key={obj.id} cx={obj.x + obj.w / 2} cy={obj.y + obj.h / 2} rx={obj.w / 2} ry={obj.h / 2} fill={obj.color} stroke="rgba(29,29,27,0.4)" strokeWidth={4} />
+              <ellipse key={obj.id} cx={obj.x + obj.w / 2} cy={obj.y + obj.h / 2} rx={obj.w / 2} ry={obj.h / 2} fill={obj.color} stroke="rgba(16,28,51,0.4)" strokeWidth={4} />
             ) : (
-              <rect key={obj.id} x={obj.x} y={obj.y} width={obj.w} height={obj.h} rx={10} fill={obj.color} stroke="rgba(29,29,27,0.4)" strokeWidth={4} />
+              <rect key={obj.id} x={obj.x} y={obj.y} width={obj.w} height={obj.h} rx={10} fill={obj.color} stroke="rgba(16,28,51,0.4)" strokeWidth={4} />
             )
           case 'text':
-            return <rect key={obj.id} x={obj.x} y={obj.y} width={Math.min(obj.w, obj.text.length * obj.fontSize * 0.5)} height={obj.fontSize} rx={4} fill="rgba(29,29,27,0.7)" />
+            return <rect key={obj.id} x={obj.x} y={obj.y} width={Math.min(obj.w, obj.text.length * obj.fontSize * 0.5)} height={obj.fontSize} rx={4} fill="rgba(16,28,51,0.7)" />
           case 'connector': {
             const route = connectorRoute(obj, (id) => byId.get(id))
             if (!route) return null

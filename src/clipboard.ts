@@ -116,5 +116,5 @@ export function textToObjects(text: string, at: Point, author: string, stickyCol
       author,
     }))
   }
-  return [{ type: 'text' as const, x: Math.round(at.x - 200), y: Math.round(at.y - 20), w: 400, text: lines.join('\n'), fontSize: 20, color: '#1d1d1b', author }]
+  return [{ type: 'text' as const, x: Math.round(at.x - 200), y: Math.round(at.y - 20), w: 400, text: lines.join('\n'), fontSize: 20, color: '#101c33', author }]
 }

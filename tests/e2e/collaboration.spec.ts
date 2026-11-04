@@ -82,7 +82,7 @@ test('connectors follow objects, sections carry their content, undo reverts', as
   await page.keyboard.press('f')
   await drag(page, await toScreen(page, { x: a.x - 80, y: a.y - 80 }), await toScreen(page, { x: b.x + 280, y: b.y + 280 }))
   const [section] = await objectsOfType(page, 'section')
-  expect(section.title).toBe('Section 1')
+  expect(section.title).toBe('Zone 1')
   const title = await toScreen(page, { x: section.x + 40, y: section.y + 22 })
   await drag(page, title, { x: title.x + 120, y: title.y + 60 })
   const dx = 120 / (await scale(page))

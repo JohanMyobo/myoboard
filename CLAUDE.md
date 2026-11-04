@@ -1,7 +1,7 @@
 # Myoboard
 
 Open-source (MIT), self-hostable collaborative whiteboard: sticky notes,
-shapes, text, pen, connectors, sections, reaction stamps, live cursors,
+shapes, text, pen, connectors, zones, reactions, live cursors,
 real-time sync and PNG export, behind sign-in with per-board permissions.
 TypeScript end to end: a React + Konva client and one Node server that
 serves the app, a JSON API and sign-in, and syncs boards over WebSockets
@@ -124,7 +124,7 @@ server/
   health.ts          `npm run health`: wait until a server answers
   test-helpers.ts    start an app, sign in, sync clients with a cookie
 tests/e2e/           Playwright specs and helpers
-replica/             feature matrix, parity score, recon notes
+roadmap/             feature checklist (features.csv) and its score
 Dockerfile, compose.yaml   the container image and how to run it
 ```
 
@@ -271,7 +271,8 @@ Dockerfile, compose.yaml   the container image and how to run it
 - Unit tests sit next to the code (`*.test.ts`); E2E specs in `tests/e2e/`.
 - Comments say why, not what, and stay rare.
 - Icons come from `lucide-react`; colours and fonts from
-  `src/model/palette.ts`.
+  `src/model/palette.ts` (canvas) and the `:root` tokens in `src/styles.css`
+  (UI). See "Look and wording".
 - Commit messages: an imperative summary line, then a short why.
 - Commits are public with their author address. Before the first commit on a
   new machine, check `git config user.email`; if it is not the user's
@@ -285,14 +286,39 @@ Dockerfile, compose.yaml   the container image and how to run it
 3. New behaviour comes with a test: a unit test for model or server logic,
    an E2E test for interactions.
 4. A user-facing feature also updates README.md ("Features", "Not built
-   yet") and its row in `replica/features.csv`, then re-scores parity:
-   `python3 replica/parity.py replica/features.csv --markdown > replica/parity.md`
+   yet") and its row in `roadmap/features.csv`, then re-scores it:
+   `python3 roadmap/score.py roadmap/features.csv --markdown > roadmap/score.md`
    (`py` instead of `python3` on Windows).
+
+## Look and wording
+
+Myoboard has its own identity, in the Myobo brand. Keep it, and don't restyle
+it after another product.
+
+- Colours: Myobo navy `#0d3272` (`--accent`, `BRAND_NAVY`: primary buttons,
+  the pressed tool, zone tags) and Myobo sky `#38b6ff` (`--sky`, `ACCENT`:
+  focus rings, selection, resize handles). Ink is a navy black, `#101c33`;
+  greys and shadows are tinted navy, not warm.
+- Type: Lustria (`--font-title`, bundled by `@fontsource/lustria`, weight 400
+  only, so never bold it) for titles in the HTML UI: board title, page and
+  dialog headings, the wordmark. Inter for everything else and for all canvas
+  text: Konva measures text when it draws, so the canvas stays on fonts that
+  need no loading.
+- Sticky notes have a folded bottom-right corner (`stickyFoldSize`), the
+  same fold as the logo, a darker shade of the note (`darken`). Note and fold
+  are one Konva node (`drawSticky` in `nodes.tsx`, with a rectangular
+  `hitFunc`): a second node per note doubles the frame time at 26% zoom with
+  500 notes.
+- Zones carry a navy pill with their title. The canvas is a fine grid of
+  lines (`--grid-lines`), not dots.
+- Words: the UI says **Zone** and **Reaction**. The code and the stored
+  documents keep `section` and `stamp` (types, tools, CSS classes): boards
+  already saved use them, so don't rename those.
 
 ## Clean-room rules
 
-Myoboard reimplements the core of a commercial whiteboard product from public
-information only. Keep it that way:
+Myoboard is built from public information only, with its own look and
+wording. Keep it that way:
 
 - Never open, decompile, read the bundles of, or record the network traffic
   of a commercial whiteboard or design tool, and never use one (in a browser
@@ -302,8 +328,9 @@ information only. Keep it that way:
 - Never copy another product's code, icons, illustrations, sounds, wording or
   branding, and don't name other whiteboard products in code, UI, docs or
   commits.
-- Dependencies must be MIT, ISC, BSD, Apache-2.0 or CC0: no AGPL, no
-  source-available packages, nothing that needs a licence key.
+- Dependencies must be MIT, ISC, BSD, Apache-2.0 or CC0 (fonts may be
+  OFL-1.1): no AGPL, no source-available packages, nothing that needs a
+  licence key, no font whose licence forbids redistribution.
 
 ## Security
 
@@ -320,7 +347,8 @@ information only. Keep it that way:
 
 v2 is done: access (sign-in, permissions, board list, CI), content
 (images, copy and paste, 10 shapes, connectors with labels) and workshops
-(comments, templates, timer, voting, exports, Docker image); parity 87/100.
-Candidates next, see `replica/parity.md`: rich text, files other than
+(comments, templates, timer, voting, exports, Docker image); its own look in
+the Myobo brand; feature checklist 87/100. Candidates next, see
+`roadmap/score.md`: rich text, a French interface, files other than
 images, pinch zoom. The maintainer sets the scope: check with the user
 before starting a large feature.
